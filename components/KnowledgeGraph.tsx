@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ExpandedKnowledgeGraph from "./ExpandedKnowledgeGraph";
 import Link from "next/link";
@@ -12,42 +12,42 @@ const NODE_SIZES: Record<string, number> = {
 };
 const WIDTH = 320;
 const HEIGHT = 280;
-const PHYSICS_ITER = 2;
+const PHYSICS_ITER = 1;
 
 function getTheme() {
   if (typeof window === "undefined") return "light";
   return (document.documentElement.getAttribute("data-theme") || "light");
 }
 
-const KnowledgeGraph: React.FC = () => {
-  // Fallback: static node/page list for client-side rendering
-  const notePages = ["science-tree", "chemistry", "biology", "physics"];
-  const titles: Record<string, string> = {
-    "science-tree": "Science Tree",
-    chemistry: "Chemistry",
-    biology: "Biology",
-    physics: "Physics",
-  };
-  const relateds: Record<string, string[]> = {
-    "science-tree": ["chemistry", "biology", "physics"],
-    chemistry: ["biology", "physics"],
-    biology: ["chemistry", "physics"],
-    physics: ["chemistry", "biology"],
-  };
-  const edgesFromRelated = (pages: string[], relateds: Record<string, string[]>) => {
-    const edges: { from: string; to: string }[] = [];
-    for (const [from, rels] of Object.entries(relateds)) {
-      for (const to of rels) {
-        if (pages.includes(to)) {
-          edges.push({ from, to });
-        }
+const notePages = ["science-tree", "chemistry", "biology", "physics"];
+const titles: Record<string, string> = {
+  "science-tree": "Science Tree",
+  chemistry: "Chemistry",
+  biology: "Biology",
+  physics: "Physics",
+};
+const relateds: Record<string, string[]> = {
+  "science-tree": ["chemistry", "biology", "physics"],
+  chemistry: ["biology", "physics"],
+  biology: ["chemistry", "physics"],
+  physics: ["chemistry", "biology"],
+};
+function edgesFromRelated(pages: string[], relateds: Record<string, string[]>) {
+  const edges: { from: string; to: string }[] = [];
+  for (const [from, rels] of Object.entries(relateds)) {
+    for (const to of rels) {
+      if (pages.includes(to)) {
+        edges.push({ from, to });
       }
     }
-    return edges;
-  };
-  const initialNodes = notePages.map(id => ({ id, label: titles[id] || id, color: id === "science-tree" ? "#2463eb" : id === "chemistry" ? "#f59e42" : id === "biology" ? "#22c55e" : id === "physics" ? "#f43f5e" : "#666" }));
-  const edges = edgesFromRelated(notePages, relateds);
+  }
+  return edges;
+}
 
+const initialNodes = notePages.map(id => ({ id, label: titles[id] || id, color: id === "science-tree" ? "#2463eb" : id === "chemistry" ? "#f59e42" : id === "biology" ? "#22c55e" : id === "physics" ? "#f43f5e" : "#666" }));
+const edges = edgesFromRelated(notePages, relateds);
+
+const KnowledgeGraph: React.FC = () => {
   const [hovered, setHovered] = useState<string | null>(null);
   const [theme, setTheme] = useState("light");
   const [dragged, setDragged] = useState<string | null>(null);
@@ -100,22 +100,26 @@ const KnowledgeGraph: React.FC = () => {
     let animation: number;
     function step() {
       setPositions(prev => {
-        let next = { ...prev };
+        const next = { ...prev };
         for (let i = 0; i < initialNodes.length; ++i) {
           for (let j = i + 1; j < initialNodes.length; ++j) {
             const a = initialNodes[i], b = initialNodes[j];
             const dx = next[a.id].x - next[b.id].x;
             const dy = next[a.id].y - next[b.id].y;
             const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-            const minDist = (NODE_SIZES[a.id] || 10) + (NODE_SIZES[b.id] || 10) + 18; // Increased minDist for more spacing
+            const minDist = (NODE_SIZES[a.id] || 10) + (NODE_SIZES[b.id] || 10) + 18;
             if (dist < minDist) {
               const force = 0.12 * (minDist - dist);
               const fx = (dx / dist) * force;
               const fy = (dy / dist) * force;
-              next[a.id].vx += fx;
-              next[a.id].vy += fy;
-              next[b.id].vx -= fx;
-              next[b.id].vy -= fy;
+              if (dragged !== a.id) {
+                next[a.id].vx += fx;
+                next[a.id].vy += fy;
+              }
+              if (dragged !== b.id) {
+                next[b.id].vx -= fx;
+                next[b.id].vy -= fy;
+              }
             }
           }
         }
@@ -123,19 +127,23 @@ const KnowledgeGraph: React.FC = () => {
           const a = next[edge.from], b = next[edge.to];
           const dx = b.x - a.x, dy = b.y - a.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          const desired = 64; // Increased desired edge length
+          const desired = 64;
           if (dist > 0.1) {
             const force = 0.03 * (dist - desired);
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
-            a.vx += fx;
-            a.vy += fy;
-            b.vx -= fx;
-            b.vy -= fy;
+            if (dragged !== edge.from) {
+              a.vx += fx;
+              a.vy += fy;
+            }
+            if (dragged !== edge.to) {
+              b.vx -= fx;
+              b.vy -= fy;
+            }
           }
         }
         for (const n of initialNodes) {
-          if (dragged === n.id) continue;
+          if (dragged === n.id) continue; // Don't update dragged node
           next[n.id].vx *= 0.7;
           next[n.id].vy *= 0.7;
           next[n.id].x += next[n.id].vx;
@@ -149,7 +157,7 @@ const KnowledgeGraph: React.FC = () => {
     }
     for (let i = 0; i < PHYSICS_ITER; ++i) step();
     return () => cancelAnimationFrame(animation);
-  }, [dragged, initialNodes.length, mounted]);
+  }, [dragged, mounted]);
 
   function handlePointerDown(e: React.PointerEvent, id: string) {
     setDragged(id);
@@ -174,7 +182,7 @@ const KnowledgeGraph: React.FC = () => {
       },
     }));
   }
-  function handlePointerUp(e?: React.PointerEvent) {
+  function handlePointerUp() {
     setDragged(null);
     setTimeout(() => setMouseMoved(false), 0);
   }

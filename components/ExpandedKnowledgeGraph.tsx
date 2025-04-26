@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 const initialNodes = [
@@ -40,15 +40,14 @@ const ExpandedKnowledgeGraph: React.FC<{ onClose?: () => void }> = ({ onClose })
   const [positions, setPositions] = useState<Record<string, { x: number; y: number; vx: number; vy: number }>>(() => {
     const cx = WIDTH / 2, cy = HEIGHT / 2, r = 170;
     const obj: Record<string, { x: number; y: number; vx: number; vy: number }> = {};
-    initialNodes.forEach((n, i) => {
+    initialNodes.forEach((n) => {
       if (n.type === "root") {
         obj[n.id] = { x: cx, y: cy, vx: 0, vy: 0 };
       } else {
-        const idx = initialNodes.findIndex(nd => nd.id === n.id) - 1;
         const angleStep = (2 * Math.PI) / (initialNodes.length - 1);
         obj[n.id] = {
-          x: cx + r * Math.cos(idx * angleStep),
-          y: cy + r * Math.sin(idx * angleStep),
+          x: cx + r * Math.cos((initialNodes.findIndex(nd => nd.id === n.id) - 1) * angleStep),
+          y: cy + r * Math.sin((initialNodes.findIndex(nd => nd.id === n.id) - 1) * angleStep),
           vx: 0,
           vy: 0,
         };
@@ -76,7 +75,7 @@ const ExpandedKnowledgeGraph: React.FC<{ onClose?: () => void }> = ({ onClose })
     let animation: number;
     function step() {
       setPositions(prev => {
-        let next = { ...prev };
+        const next = { ...prev };
         for (let i = 0; i < initialNodes.length; ++i) {
           for (let j = i + 1; j < initialNodes.length; ++j) {
             const a = initialNodes[i], b = initialNodes[j];
@@ -150,7 +149,7 @@ const ExpandedKnowledgeGraph: React.FC<{ onClose?: () => void }> = ({ onClose })
       },
     }));
   }
-  function handlePointerUp(e?: React.PointerEvent) {
+  function handlePointerUp() {
     setDragged(null);
     setTimeout(() => setMouseMoved(false), 0);
   }
