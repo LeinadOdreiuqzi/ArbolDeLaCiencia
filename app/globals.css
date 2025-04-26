@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fff;
+  --foreground: #1a1a1a;
+  --nav-bg: #f7f7fa;
+  --aside-bg: #fafbff;
+  --border: #e0e0e0;
+}
+
+/* Removed @theme inline block as it is not valid CSS */
+
+[data-theme="dark"] {
+  --background: #18181b;
+  --foreground: #f3f3f3;
+  --nav-bg: #232329;
+  --aside-bg: #20212b;
+  --border: #23232c;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.wiki-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr 340px;
+  min-height: 100vh;
+  background: var(--background);
+}
+
+.wiki-nav {
+  background: var(--nav-bg);
+  border-right: 1px solid var(--border);
+  padding: 1.5rem 1rem;
+  min-height: 100vh;
+}
+
+.wiki-main {
+  padding: 2.5rem 3rem;
+  min-height: 100vh;
+  color: var(--foreground);
+  background: var(--background);
+  font-size: 1.18rem;
+  line-height: 1.7;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(60,60,60,0.04);
+  margin: 2rem 0;
+}
+
+.wiki-main h1, .wiki-main h2, .wiki-main h3 {
+  font-family: 'Geist', Arial, Helvetica, sans-serif;
+  font-weight: bold;
+  margin-top: 2.2rem;
+  margin-bottom: 1.1rem;
+}
+
+.wiki-main ul, .wiki-main ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1.3rem;
+}
+
+.wiki-main a {
+  color: #0a6cff;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+.wiki-main a:hover {
+  color: #003366;
+}
+
+.wiki-main .external-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+}
+
+.wiki-main blockquote {
+  border-left: 4px solid #0a6cff;
+  padding-left: 1rem;
+  color: #555;
+  margin: 1.5rem 0;
+  background: #f7faff;
+  border-radius: 6px;
+}
+
+.wiki-graph {
+  background: var(--aside-bg);
+  border-left: 1px solid var(--border);
+  padding: 1.5rem 1rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.wiki-related {
+  margin-top: 24px;
+  background: var(--background);
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 1px 4px rgba(60,60,60,0.04);
+}
+
+.theme-toggle {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--foreground);
+  transition: color 0.2s;
+}
+
+.theme-toggle:focus {
+  outline: 2px solid var(--foreground);
+}
+
+/* Main wiki links (important, but not too blue) */
+.wiki-link-main {
+  color: #4b5563;
+  text-decoration: underline;
+  font-weight: 500;
+  transition: color 0.18s;
+}
+.wiki-link-main:hover {
+  color: #2463eb;
+  text-decoration: underline;
+}
+
+/* Anchor links for headings (sidebar) */
+.wiki-anchor-main {
+  color: #2463eb;
+  font-weight: 600;
+  text-decoration: underline;
+  transition: color 0.18s;
+}
+.wiki-anchor-main:hover {
+  color: #1e40af;
+}
+.wiki-anchor-secondary {
+  color: #6b7280;
+  font-weight: 500;
+  text-decoration: underline;
+  transition: color 0.18s;
+}
+.wiki-anchor-secondary:hover {
+  color: #2463eb;
+}
+
+/* General link smoothing */
+a, .wiki-link-main, .wiki-anchor-main, .wiki-anchor-secondary {
+  transition: color 0.18s, background 0.18s;
+}
