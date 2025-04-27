@@ -4,7 +4,7 @@ import MdxPage from "../../../components/MdxPage";
 
 const Content = dynamic(() => import("./content.mdx"));
 
-export default function ChemistryPage() {
+export default function ComputationPage() {
   return (
     <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-start" }}>
       {/* Main Content Left */}

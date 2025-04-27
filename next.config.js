@@ -2,7 +2,7 @@ const withMDX = require('@next/mdx')({
   extension: /\.mdx?$/, // This matches .md and .mdx
   options: {
     remarkPlugins: [
-      async () => (await import('./lib/remark-wikilink.js')).default
+      require('./lib/remark-wikilink.js')
     ],
   },
 });

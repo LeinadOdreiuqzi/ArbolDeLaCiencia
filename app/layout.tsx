@@ -3,11 +3,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import KnowledgeGraph from "../components/KnowledgeGraph";
+import LargeKnowledgeGraph from "../components/LargeKnowledgeGraph";
 import ThemeToggle from "../components/ThemeToggle";
 import Link from "next/link";
 import WikiHeadingsLinks from "../components/WikiHeadingsLinks";
-import { useState } from "react";
+import WikiNav from "../components/WikiNav";
+import { useState, useMemo } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,59 +43,29 @@ export default function RootLayout({
   // Determine grid columns for wiki-layout based on navOpen
   const gridColumns = navOpen ? "260px 1fr 340px" : "0 1fr 340px";
 
+  // Topics and subtopics for global search
+  const allTopics = useMemo(() => [
+    { slug: "science-tree", title: "Science Tree" },
+    { slug: "chemistry", title: "Chemistry" },
+    { slug: "biology", title: "Biology" },
+    { slug: "physics", title: "Physics" },
+    // Add more here if you expand
+  ], []);
+  const [search, setSearch] = useState("");
+  const filteredTopics = search.trim()
+    ? allTopics.filter(t => t.title.toLowerCase().includes(search.trim().toLowerCase()) || t.slug.toLowerCase().includes(search.trim().toLowerCase()))
+    : allTopics;
+
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <div className="wiki-layout" style={{ gridTemplateColumns: gridColumns }}>
-          <aside className={`wiki-nav${navOpen ? "" : " nav-hidden"}`} style={{ position: "relative" }}>
-            <button
-              className="wiki-nav-toggle"
-              aria-label={navOpen ? "Hide navigation" : "Show navigation"}
-              onClick={() => setNavOpen((open) => !open)}
-              style={{
-                position: "absolute",
-                top: 12,
-                left: navOpen ? "100%" : 8,
-                transform: navOpen ? "translateX(-100%)" : "none",
-                zIndex: 50,
-                marginLeft: navOpen ? 0 : 0,
-                background: "#fff",
-                border: "1px solid #ccc",
-                borderRadius: "50%",
-                width: 32,
-                height: 32,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 20,
-                cursor: "pointer",
-                boxShadow: "0 1px 4px 0 #0001",
-                transition: "left 0.3s, background 0.2s, color 0.2s"
-              }}
-            >
-              {navOpen ? "←" : "→"}
-            </button>
-            <div style={{ display: navOpen ? "block" : "none" }}>
-              <ThemeToggle />
-              <nav>
-                <h2 className="wiki-nav-title">Topics</h2>
-                <ul className="wiki-nav-list">
-                  {topics.map(topic => (
-                    <li key={topic.slug}>
-                      <Link href={`/notes/${topic.slug}`} className="wiki-link-main">
-                        {topic.title}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            </div>
-          </aside>
+          <WikiNav navOpen={navOpen} setNavOpen={setNavOpen} ThemeToggle={ThemeToggle} />
           <main className="wiki-main">{children}</main>
           <aside className="wiki-graph">
-            <KnowledgeGraph />
+            <LargeKnowledgeGraph />
             <div className="wiki-related">
               <WikiHeadingsLinks />
             </div>

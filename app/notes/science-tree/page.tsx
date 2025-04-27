@@ -1,6 +1,8 @@
 "use client";
 import dynamic from "next/dynamic";
 import MdxPage from "../../../components/MdxPage";
+import KnowledgeGraph from "../../../components/KnowledgeGraph";
+
 const Content = dynamic(() => import("./content.mdx"));
 
 export default function ScienceTreePage() {
@@ -12,7 +14,10 @@ export default function ScienceTreePage() {
           <Content />
         </MdxPage>
       </div>
-      {/* Sidebar Right is now globally handled in layout.tsx */}
+      {/* Sidebar Right: Knowledge Graph */}
+      {/* <div style={{ width: 340, marginLeft: 32, minWidth: 320 }}>
+        <KnowledgeGraph />
+      </div> */}
     </div>
   );
 }
