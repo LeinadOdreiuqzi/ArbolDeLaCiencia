@@ -2,17 +2,33 @@
 import React, { useRef, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
-import { buildNotesTree, TopicNode } from "../lib/notes-graph-util";
+import { TopicNode } from "../lib/notes-graph-util";
 
 // Dynamically import ForceGraph2D to avoid SSR issues
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
+// --- Utility: Get current page id from pathname ---
+function getCurrentPageId(pathname: string | null) {
+  if (pathname === null) return "science-tree";
+  const pathParts = pathname.split("/").filter(Boolean);
+  if (pathParts[0] === "notes" && pathParts[1]) return pathParts[1];
+  return "science-tree";
+}
+
+// --- Types ---
 type GraphNode = {
   id: string;
   label: string;
   level: number;
   url?: string;
   color?: string;
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+  fx?: number;
+  fy?: number;
+  children?: GraphNode[];
 };
 
 type GraphLink = {
@@ -20,18 +36,13 @@ type GraphLink = {
   target: string;
 };
 
-type ForceGraphLibNode = {
-  id?: string | number;
-  x?: number;
-  y?: number;
-  vx?: number;
-  vy?: number;
-  fx?: number;
-  fy?: number;
-  [key: string]: any;
+type GraphData = {
+  nodes: GraphNode[];
+  links: GraphLink[];
 };
 
-function flattenTreeToGraph(tree: TopicNode[], parentId: string | null = null, level: number = 0, nodes: any[] = [], links: any[] = []) {
+// --- Flatten tree to graph ---
+function flattenTreeToGraph(tree: TopicNode[], parentId: string | null = null, level: number = 0, nodes: GraphNode[] = [], links: GraphLink[] = []): GraphData {
   for (const node of tree) {
     nodes.push({ id: node.id, label: node.label, url: node.url, level });
     if (parentId) links.push({ source: parentId, target: node.id });
@@ -40,19 +51,18 @@ function flattenTreeToGraph(tree: TopicNode[], parentId: string | null = null, l
   return { nodes, links };
 }
 
-function getCurrentPageId(pathname: string | null) {
-  if (pathname === null) return "science-tree";
-  const pathParts = pathname.split("/").filter(Boolean);
-  if (pathParts[0] === "notes" && pathParts[1]) return pathParts[1];
-  return "science-tree";
+function getNodeLabel(node: { [key: string]: any }): string {
+  return typeof node.label === "string" ? node.label : "";
 }
-
-// Helper to safely extract label/level from a possibly-generic node
-function getNodeLabel(node: any): string {
-  return typeof node.label === 'string' ? node.label : '';
+function getNodeLevel(node: { [key: string]: any }): number {
+  return typeof node.level === "number" ? node.level : 0;
 }
-function getNodeLevel(node: any): number {
-  return typeof node.level === 'number' ? node.level : 0;
+function getNodeRadius(node: { [key: string]: any }) {
+  const level = getNodeLevel(node);
+  if (level === 0) return 16;
+  if (level === 1) return 10;
+  if (level === 2) return 7;
+  return 6;
 }
 
 // Helper to get neutral node color based on theme
@@ -64,14 +74,6 @@ function getNeutralNodeColor(theme: 'light' | 'dark', highlight: boolean) {
 function getLinkColor(theme: 'light' | 'dark', highlight: boolean) {
   if (highlight) return theme === 'dark' ? '#fbbf24' : '#2563eb'; // highlight: yellow or blue
   return theme === 'dark' ? '#555' : '#bbb'; // dimmed
-}
-
-function getNodeRadius(node: any) {
-  const level = getNodeLevel(node);
-  if (level === 0) return 16;
-  if (level === 1) return 10;
-  if (level === 2) return 7;
-  return 6;
 }
 
 const minimizedWidth = 320;
@@ -104,7 +106,7 @@ function useThemeFromDocument(): 'light' | 'dark' {
 }
 
 // Enhanced highlighting: highlight all related topics and subtopics recursively
-function getHighlightState(nodeId: string | null, graphData: { nodes: GraphNode[], links: GraphLink[] }) {
+function getHighlightState(nodeId: string | null, graphData: GraphData) {
   if (!nodeId) return { neighborNodes: new Set(), neighborLinks: new Set() };
 
   // 1. Science Tree node highlights everything
@@ -164,10 +166,10 @@ function getHighlightState(nodeId: string | null, graphData: { nodes: GraphNode[
 }
 
 const LargeKnowledgeGraph: React.FC = () => {
-  const [graphData, setGraphData] = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
+  const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const fgRef = useRef<any>(null);
+  const fgRef = useRef<any>(null); // Use correct ForceGraph2D ref type if available
   const theme = useThemeFromDocument();
   const router = useRouter();
   const pathname = usePathname();
@@ -208,13 +210,13 @@ const LargeKnowledgeGraph: React.FC = () => {
         if (fgRef.current) {
           // Try to find the root node's coordinates
           const nodes = fgRef.current._fg ? fgRef.current._fg.graphData().nodes : [];
-          const rootNode = nodes.find((n: any) => n.id === rootNodeId);
+          const rootNode = nodes.find((n: GraphNode) => n.id === rootNodeId);
           if (rootNode && typeof rootNode.x === 'number' && typeof rootNode.y === 'number') {
             fgRef.current.centerAt(rootNode.x, rootNode.y, 400);
             fgRef.current.zoom(1.0, 400);
           } else {
             // fallback: fit to graph
-            fgRef.current.zoomToFit(350, 40, (n: any) => true);
+            fgRef.current.zoomToFit(350, 40, (n: GraphNode) => true);
             setTimeout(() => {
               if (fgRef.current) {
                 const currZoom = fgRef.current.zoom();
@@ -230,7 +232,7 @@ const LargeKnowledgeGraph: React.FC = () => {
   useEffect(() => {
     if (fgRef.current && graphData.nodes.length > 1) {
       // Fit to graph with padding, but don't zoom in too close
-      fgRef.current.zoomToFit(400, 40, (n: any) => true);
+      fgRef.current.zoomToFit(400, 40, (n: GraphNode) => true);
       setTimeout(() => {
         if (fgRef.current) {
           // If zoom is too close, set a reasonable zoom level
@@ -270,7 +272,7 @@ const LargeKnowledgeGraph: React.FC = () => {
         backgroundColor={bgColor}
         enablePanInteraction={true}
         enableZoomInteraction={true}
-        nodeCanvasObject={(node: ForceGraphLibNode, ctx, globalScale) => {
+        nodeCanvasObject={(node: { [key: string]: any }, ctx, globalScale) => {
           const label = getNodeLabel(node);
           const x = typeof node.x === "number" ? node.x : 0;
           const y = typeof node.y === "number" ? node.y : 0;
@@ -329,8 +331,8 @@ const LargeKnowledgeGraph: React.FC = () => {
         linkDirectionalParticles={0}
         linkDirectionalArrowLength={0}
         linkCanvasObjectMode={() => undefined}
-        onNodeHover={(node: ForceGraphLibNode | null, prevNode: ForceGraphLibNode | null) => setHoveredNode(node && node.id ? String(node.id) : null)}
-        onNodeClick={(node: ForceGraphLibNode, event) => {
+        onNodeHover={(node: any | null, prevNode: any | null) => setHoveredNode(node && node.id ? String(node.id) : null)}
+        onNodeClick={(node: any, event) => {
           if (node && node.url) router.push(node.url);
         }}
       />
@@ -371,7 +373,7 @@ const LargeKnowledgeGraph: React.FC = () => {
               backgroundColor={bgColor}
               enablePanInteraction={true}
               enableZoomInteraction={true}
-              nodeCanvasObject={(node: ForceGraphLibNode, ctx, globalScale) => {
+              nodeCanvasObject={(node: { [key: string]: any }, ctx, globalScale) => {
                 const label = getNodeLabel(node);
                 const x = typeof node.x === "number" ? node.x : 0;
                 const y = typeof node.y === "number" ? node.y : 0;
@@ -430,8 +432,8 @@ const LargeKnowledgeGraph: React.FC = () => {
               linkDirectionalParticles={0}
               linkDirectionalArrowLength={0}
               linkCanvasObjectMode={() => undefined}
-              onNodeHover={(node: ForceGraphLibNode | null, prevNode: ForceGraphLibNode | null) => setHoveredNode(node && node.id ? String(node.id) : null)}
-              onNodeClick={(node: ForceGraphLibNode, event) => {
+              onNodeHover={(node: any | null, prevNode: any | null) => setHoveredNode(node && node.id ? String(node.id) : null)}
+              onNodeClick={(node: any, event) => {
                 if (node && node.url) router.push(node.url);
               }}
             />

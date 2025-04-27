@@ -1,7 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
 import MdxPage from "../../../components/MdxPage";
-import KnowledgeGraph from "../../../components/KnowledgeGraph";
 
 const Content = dynamic(() => import("./content.mdx"));
 
