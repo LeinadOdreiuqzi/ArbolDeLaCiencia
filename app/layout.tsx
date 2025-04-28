@@ -1,6 +1,5 @@
 "use client";
 
-import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import LargeKnowledgeGraph from "../components/LargeKnowledgeGraph";
@@ -18,14 +17,6 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-
-// Define allTopics as a static array (no hook needed)
-const allTopics = [
-  { slug: "science-tree", title: "Science Tree" },
-  { slug: "chemistry", title: "Chemistry" },
-  { slug: "biology", title: "Biology" },
-  { slug: "physics", title: "Physics" },
-];
 
 export default function RootLayout({
   children,

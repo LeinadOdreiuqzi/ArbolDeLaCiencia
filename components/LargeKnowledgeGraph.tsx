@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import { TopicNode } from "../lib/notes-graph-util";
+import type { ForceGraphMethods } from "react-force-graph-2d";
 
 // Dynamically import ForceGraph2D to avoid SSR issues
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
@@ -51,29 +52,18 @@ function flattenTreeToGraph(tree: TopicNode[], parentId: string | null = null, l
   return { nodes, links };
 }
 
-function getNodeLabel(node: { [key: string]: any }): string {
+function getNodeLabel(node: { [key: string]: unknown }): string {
   return typeof node.label === "string" ? node.label : "";
 }
-function getNodeLevel(node: { [key: string]: any }): number {
+function getNodeLevel(node: { [key: string]: unknown }): number {
   return typeof node.level === "number" ? node.level : 0;
 }
-function getNodeRadius(node: { [key: string]: any }) {
+function getNodeRadius(node: { [key: string]: unknown }) {
   const level = getNodeLevel(node);
   if (level === 0) return 16;
   if (level === 1) return 10;
   if (level === 2) return 7;
   return 6;
-}
-
-// Helper to get neutral node color based on theme
-function getNeutralNodeColor(theme: 'light' | 'dark', highlight: boolean) {
-  if (highlight) return theme === 'dark' ? '#fbbf24' : '#2563eb'; // highlight: yellow or blue
-  return theme === 'dark' ? '#bbb' : '#888'; // neutral node color
-}
-// Helper to get connection color based on theme and highlight
-function getLinkColor(theme: 'light' | 'dark', highlight: boolean) {
-  if (highlight) return theme === 'dark' ? '#fbbf24' : '#2563eb'; // highlight: yellow or blue
-  return theme === 'dark' ? '#555' : '#bbb'; // dimmed
 }
 
 const minimizedWidth = 320;
@@ -165,11 +155,16 @@ function getHighlightState(nodeId: string | null, graphData: GraphData) {
   return { neighborNodes, neighborLinks };
 }
 
+function getLinkKey(link: { [key: string]: unknown }) {
+  return String(link.source) + "->" + String(link.target);
+}
+
 const LargeKnowledgeGraph: React.FC = () => {
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const fgRef = useRef<any>(null); // Use correct ForceGraph2D ref type if available
+  // Use correct type for ForceGraphMethods ref and provide an initial value
+  const fgRef = useRef<ForceGraphMethods<{ [key: string]: unknown }, { [key: string]: unknown }>>(undefined);
   const theme = useThemeFromDocument();
   const router = useRouter();
   const pathname = usePathname();
@@ -180,11 +175,11 @@ const LargeKnowledgeGraph: React.FC = () => {
       const tree = await res.json();
       const currentPageId = getCurrentPageId(pathname);
       let subTree = tree;
-      function findNodeById(nodes: any[], id: string): any | null {
+      function findNodeById(nodes: { [key: string]: unknown }[], id: string): { [key: string]: unknown } | null {
         for (const node of nodes) {
           if (node.id === id) return node;
           if (node.children) {
-            const found = findNodeById(node.children, id);
+            const found = findNodeById(node.children as { [key: string]: unknown }[], id);
             if (found) return found;
           }
         }
@@ -208,15 +203,15 @@ const LargeKnowledgeGraph: React.FC = () => {
       // Wait for layout to finish
       setTimeout(() => {
         if (fgRef.current) {
-          // Try to find the root node's coordinates
-          const nodes = fgRef.current._fg ? fgRef.current._fg.graphData().nodes : [];
-          const rootNode = nodes.find((n: GraphNode) => n.id === rootNodeId);
+          // Use graphData.nodes directly for root node lookup
+          const nodes = graphData.nodes;
+          const rootNode = nodes.find((n: { [key: string]: unknown }) => n.id === rootNodeId);
           if (rootNode && typeof rootNode.x === 'number' && typeof rootNode.y === 'number') {
             fgRef.current.centerAt(rootNode.x, rootNode.y, 400);
             fgRef.current.zoom(1.0, 400);
           } else {
             // fallback: fit to graph
-            fgRef.current.zoomToFit(350, 40, (n: GraphNode) => true);
+            fgRef.current.zoomToFit(350, 40, (n: { [key: string]: unknown }) => true);
             setTimeout(() => {
               if (fgRef.current) {
                 const currZoom = fgRef.current.zoom();
@@ -232,7 +227,7 @@ const LargeKnowledgeGraph: React.FC = () => {
   useEffect(() => {
     if (fgRef.current && graphData.nodes.length > 1) {
       // Fit to graph with padding, but don't zoom in too close
-      fgRef.current.zoomToFit(400, 40, (n: GraphNode) => true);
+      fgRef.current.zoomToFit(400, 40, (n: { [key: string]: unknown }) => true);
       setTimeout(() => {
         if (fgRef.current) {
           // If zoom is too close, set a reasonable zoom level
@@ -272,13 +267,13 @@ const LargeKnowledgeGraph: React.FC = () => {
         backgroundColor={bgColor}
         enablePanInteraction={true}
         enableZoomInteraction={true}
-        nodeCanvasObject={(node: { [key: string]: any }, ctx, globalScale) => {
+        nodeCanvasObject={(node: { [key: string]: unknown }, ctx) => {
           const label = getNodeLabel(node);
           const x = typeof node.x === "number" ? node.x : 0;
           const y = typeof node.y === "number" ? node.y : 0;
           ctx.save();
           ctx.beginPath();
-          let r = getNodeRadius(node);
+          const r = getNodeRadius(node);
           ctx.arc(x, y, r, 0, 2 * Math.PI, false);
           ctx.globalAlpha = 0.01; // invisible but catches pointer events
           ctx.fillStyle = '#000';
@@ -288,7 +283,7 @@ const LargeKnowledgeGraph: React.FC = () => {
           ctx.save();
           ctx.beginPath();
           ctx.arc(x, y, r, 0, 2 * Math.PI, false);
-          let highlight = neighborNodes.has(node.id);
+          const highlight = neighborNodes.has(node.id);
           ctx.fillStyle = highlight ? (theme === 'dark' ? '#fbbf24' : '#2563eb') : (theme === 'dark' ? '#bbb' : '#888');
           ctx.globalAlpha = hoveredNode ? (highlight ? 1 : 0.35) : 1;
           ctx.shadowColor = highlight ? (theme === 'dark' ? '#fbbf24' : '#2563eb') : "rgba(0,0,0,0.18)";
@@ -321,19 +316,21 @@ const LargeKnowledgeGraph: React.FC = () => {
           ctx.restore();
         }}
         linkColor={(linkObj) => {
-          const idx = graphData.links.findIndex(l => l === linkObj);
-          return neighborLinks.has(idx) ? (theme === 'dark' ? '#fbbf24' : '#2563eb') : (theme === 'dark' ? '#555' : '#bbb');
+          const key = getLinkKey(linkObj);
+          const highlight = graphData.links.some(l => getLinkKey(l) === key && neighborLinks.has(graphData.links.indexOf(l)));
+          return highlight ? (theme === 'dark' ? '#fbbf24' : '#2563eb') : (theme === 'dark' ? '#555' : '#bbb');
         }}
         linkWidth={(linkObj) => {
-          const idx = graphData.links.findIndex(l => l === linkObj);
-          return neighborLinks.has(idx) ? 2.5 : 1.2;
+          const key = getLinkKey(linkObj);
+          const highlight = graphData.links.some(l => getLinkKey(l) === key && neighborLinks.has(graphData.links.indexOf(l)));
+          return highlight ? 2.5 : 1.2;
         }}
         linkDirectionalParticles={0}
         linkDirectionalArrowLength={0}
         linkCanvasObjectMode={() => undefined}
-        onNodeHover={(node: any | null, prevNode: any | null) => setHoveredNode(node && node.id ? String(node.id) : null)}
-        onNodeClick={(node: any, event) => {
-          if (node && node.url) router.push(node.url);
+        onNodeHover={(node: { [key: string]: unknown } | null) => setHoveredNode(node && node.id ? String(node.id) : null)}
+        onNodeClick={(node: { [key: string]: unknown }) => {
+          if (node && typeof node.url === 'string') router.push(node.url);
         }}
       />
       <button
@@ -373,13 +370,13 @@ const LargeKnowledgeGraph: React.FC = () => {
               backgroundColor={bgColor}
               enablePanInteraction={true}
               enableZoomInteraction={true}
-              nodeCanvasObject={(node: { [key: string]: any }, ctx, globalScale) => {
+              nodeCanvasObject={(node: { [key: string]: unknown }, ctx) => {
                 const label = getNodeLabel(node);
                 const x = typeof node.x === "number" ? node.x : 0;
                 const y = typeof node.y === "number" ? node.y : 0;
                 ctx.save();
                 ctx.beginPath();
-                let r = getNodeRadius(node);
+                const r = getNodeRadius(node);
                 ctx.arc(x, y, r, 0, 2 * Math.PI, false);
                 ctx.globalAlpha = 0.01; // invisible but catches pointer events
                 ctx.fillStyle = '#000';
@@ -389,7 +386,7 @@ const LargeKnowledgeGraph: React.FC = () => {
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(x, y, r, 0, 2 * Math.PI, false);
-                let highlight = neighborNodes.has(node.id);
+                const highlight = neighborNodes.has(node.id);
                 ctx.fillStyle = highlight ? (theme === 'dark' ? '#fbbf24' : '#2563eb') : (theme === 'dark' ? '#bbb' : '#888');
                 ctx.globalAlpha = hoveredNode ? (highlight ? 1 : 0.35) : 1;
                 ctx.shadowColor = highlight ? (theme === 'dark' ? '#fbbf24' : '#2563eb') : "rgba(0,0,0,0.18)";
@@ -422,19 +419,21 @@ const LargeKnowledgeGraph: React.FC = () => {
                 ctx.restore();
               }}
               linkColor={(linkObj) => {
-                const idx = graphData.links.findIndex(l => l === linkObj);
-                return neighborLinks.has(idx) ? (theme === 'dark' ? '#fbbf24' : '#2563eb') : (theme === 'dark' ? '#555' : '#bbb');
+                const key = getLinkKey(linkObj);
+                const highlight = graphData.links.some(l => getLinkKey(l) === key && neighborLinks.has(graphData.links.indexOf(l)));
+                return highlight ? (theme === 'dark' ? '#fbbf24' : '#2563eb') : (theme === 'dark' ? '#555' : '#bbb');
               }}
               linkWidth={(linkObj) => {
-                const idx = graphData.links.findIndex(l => l === linkObj);
-                return neighborLinks.has(idx) ? 2.5 : 1.2;
+                const key = getLinkKey(linkObj);
+                const highlight = graphData.links.some(l => getLinkKey(l) === key && neighborLinks.has(graphData.links.indexOf(l)));
+                return highlight ? 2.5 : 1.2;
               }}
               linkDirectionalParticles={0}
               linkDirectionalArrowLength={0}
               linkCanvasObjectMode={() => undefined}
-              onNodeHover={(node: any | null, prevNode: any | null) => setHoveredNode(node && node.id ? String(node.id) : null)}
-              onNodeClick={(node: any, event) => {
-                if (node && node.url) router.push(node.url);
+              onNodeHover={(node: { [key: string]: unknown } | null) => setHoveredNode(node && node.id ? String(node.id) : null)}
+              onNodeClick={(node: { [key: string]: unknown }) => {
+                if (node && typeof node.url === 'string') router.push(node.url);
               }}
             />
           </div>
