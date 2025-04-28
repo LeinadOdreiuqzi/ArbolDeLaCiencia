@@ -114,7 +114,7 @@ function getHighlightState(nodeId: string | null, graphData: GraphData) {
   // Build adjacency lists for traversal
   const childMap: Record<string, string[]> = {};
   const parentMap: Record<string, string[]> = {};
-  graphData.links.forEach((l, idx) => {
+  graphData.links.forEach((l) => {
     if (!childMap[l.source]) childMap[l.source] = [];
     childMap[l.source].push(l.target);
     if (!parentMap[l.target]) parentMap[l.target] = [];
@@ -146,9 +146,9 @@ function getHighlightState(nodeId: string | null, graphData: GraphData) {
   collectAncestors(nodeId);
 
   // Collect all links between highlighted nodes
-  graphData.links.forEach((l, idx) => {
+  graphData.links.forEach((l) => {
     if (neighborNodes.has(l.source as string) && neighborNodes.has(l.target as string)) {
-      neighborLinks.add(idx);
+      neighborLinks.add(graphData.links.indexOf(l));
     }
   });
 
@@ -211,7 +211,7 @@ const LargeKnowledgeGraph: React.FC = () => {
             fgRef.current.zoom(1.0, 400);
           } else {
             // fallback: fit to graph
-            fgRef.current.zoomToFit(350, 40, (n: { [key: string]: unknown }) => true);
+            fgRef.current.zoomToFit(350, 40, () => true);
             setTimeout(() => {
               if (fgRef.current) {
                 const currZoom = fgRef.current.zoom();
@@ -227,7 +227,7 @@ const LargeKnowledgeGraph: React.FC = () => {
   useEffect(() => {
     if (fgRef.current && graphData.nodes.length > 1) {
       // Fit to graph with padding, but don't zoom in too close
-      fgRef.current.zoomToFit(400, 40, (n: { [key: string]: unknown }) => true);
+      fgRef.current.zoomToFit(400, 40, () => true);
       setTimeout(() => {
         if (fgRef.current) {
           // If zoom is too close, set a reasonable zoom level
