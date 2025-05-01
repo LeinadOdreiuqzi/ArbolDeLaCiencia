@@ -171,7 +171,7 @@ const LargeKnowledgeGraph: React.FC = () => {
 
   useEffect(() => {
     async function fetchGraph() {
-      const res = await fetch("/api/notes-graph");
+      const res = await fetch("/api/pages");
       const tree = await res.json();
       const currentPageId = getCurrentPageId(pathname);
       let subTree = tree;

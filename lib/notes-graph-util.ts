@@ -1,59 +1,60 @@
-import fs from "fs";
-import path from "path";
-
+// lib/notes-graph-util.ts
 export type TopicNode = {
   id: string;
   label: string;
+  slug: string;
   url: string;
   children?: TopicNode[];
+  content?: any;
 };
 
-function scanTopic(dir: string, baseUrl: string): TopicNode {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const children: TopicNode[] = [];
-
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      const subdir = path.join(dir, entry.name);
-      children.push(scanTopic(subdir, `${baseUrl}/${entry.name}`));
-    } else if (entry.isFile() && entry.name.endsWith(".mdx") && entry.name !== "content.mdx") {
-      const id = entry.name.replace(/\.mdx$/, "");
-      children.push({
-        id,
-        label: id.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
-        url: `${baseUrl}/${id}`,
-      });
+function robustParseContent(input: any): any {
+  let value = input;
+  let tries = 0;
+  while (typeof value === "string" && tries < 3) {
+    try {
+      value = JSON.parse(value);
+      tries++;
+    } catch {
+      break;
     }
   }
-
-  // Use folder name as topic label
-  const topicId = path.basename(dir);
-  return {
-    id: topicId,
-    label: topicId.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
-    url: baseUrl,
-    children: children.length ? children : undefined,
-  };
+  return value;
 }
 
-// Always generate a single root node ("Science Tree") with all topics as children
-export function buildNotesTree(notesDir: string, baseUrl = "/notes"): TopicNode[] {
-  const entries = fs.readdirSync(notesDir, { withFileTypes: true });
-  const topics: TopicNode[] = [];
-  for (const entry of entries) {
-    if (entry.isDirectory() && entry.name !== "science-tree") {
-      topics.push(scanTopic(path.join(notesDir, entry.name), `${baseUrl}/${entry.name}`));
+export function pagesToTree(pages: Array<{
+  id: number;
+  title: string;
+  slug: string;
+  parent_id: number | null;
+  level: number;
+  content?: any;
+}>): TopicNode[] {
+  const nodes: { [key: number]: TopicNode & { parent_id: number | null } } = {};
+  const roots: TopicNode[] = [];
+
+  for (const page of pages) {
+    nodes[page.id] = {
+      id: String(page.id),
+      label: page.title,
+      slug: page.slug,
+      url: `/pages-arbol/${page.slug}`,
+      children: [],
+      parent_id: page.parent_id,
+      content: robustParseContent(page.content ?? null),
+    };
+  }
+
+  for (const id in nodes) {
+    const node = nodes[id];
+    if (node.parent_id && nodes[node.parent_id]) {
+      nodes[node.parent_id].children = nodes[node.parent_id].children || [];
+      nodes[node.parent_id].children!.push(node);
+    } else {
+      roots.push(node);
     }
+    (node as any).parent_id = undefined;
   }
-  // Only add the science-tree node if it exists as a directory or content.mdx file
-  let hasScienceTree = entries.some(e => e.name === "science-tree" && e.isDirectory());
-  if (!hasScienceTree) {
-    hasScienceTree = entries.some(e => e.name === "science-tree" && e.isFile());
-  }
-  return [{
-    id: "science-tree",
-    label: "Science Tree",
-    url: `${baseUrl}/science-tree`,
-    children: topics.length ? topics : undefined,
-  }];
+
+  return roots;
 }

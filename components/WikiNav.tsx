@@ -12,7 +12,7 @@ type TopicNode = {
 
 // Fetch the topic tree from the API
 async function fetchNotesTree(): Promise<TopicNode[]> {
-  const res = await fetch("/api/notes-graph");
+  const res = await fetch("/api/pages");
   if (!res.ok) throw new Error("Failed to fetch notes tree");
   return res.json();
 }
@@ -24,9 +24,15 @@ function TopicDropdown({ node }: { node: TopicNode }) {
   return (
     <li style={{ marginBottom: hasChildren ? 12 : 2 }}>
       <div style={{ display: "flex", alignItems: "center" }}>
-        <Link href={node.url} className={hasChildren ? "wiki-link-main" : "wiki-anchor-secondary"}>
-          {node.label}
-        </Link>
+        {typeof node.url === 'string' && node.url ? (
+          <Link href={node.url} className={hasChildren ? "wiki-link-main" : "wiki-anchor-secondary"}>
+            {node.label}
+          </Link>
+        ) : (
+          <span className={hasChildren ? "wiki-link-main" : "wiki-anchor-secondary"}>
+            {node.label}
+          </span>
+        )}
         {hasChildren && (
           <button
             aria-label={open ? `Collapse ${node.label}` : `Expand ${node.label}`}
