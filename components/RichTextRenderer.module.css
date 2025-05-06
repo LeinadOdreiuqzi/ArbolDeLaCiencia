@@ -1,0 +1,48 @@
+.rich-text-content {
+  font-family: var(--font-geist-sans);
+  line-height: 1.6;
+  color: var(--foreground-rgb, #333);
+}
+
+.rich-text-content h1,
+.rich-text-content h2,
+.rich-text-content h3,
+.rich-text-content h4,
+.rich-text-content h5,
+.rich-text-content h6 {
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+  font-weight: 600;
+}
+
+.rich-text-content p {
+  margin-bottom: 1em;
+}
+
+.rich-text-content ul,
+.rich-text-content ol {
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.rich-text-content blockquote {
+  border-left: 3px solid var(--accent-color, #3b82f6);
+  padding-left: 1em;
+  margin-left: 0;
+  color: var(--muted-foreground, #6b7280);
+}
+
+.rich-text-content a {
+  color: var(--accent-color, #3b82f6);
+  text-decoration: none;
+}
+
+.rich-text-content a:hover {
+  text-decoration: underline;
+}
+
+.rich-text-empty {
+  font-style: italic;
+  color: var(--muted-foreground, #6b7280);
+  padding: 1rem 0;
+} 

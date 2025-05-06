@@ -127,8 +127,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ) : slug && selected ? (
           <div>
             <h3>{selected.label}</h3>
+            {/* Pass the entire content object if it's the Tiptap JSON */}
             {selected.content
-              ? <RichTextRenderer data={selected.content} />
+              ? <RichTextRenderer content={selected.content} /> 
               : <em>Sin contenido</em>
             }
           </div>

@@ -189,7 +189,7 @@ const LargeKnowledgeGraph: React.FC = () => {
         const topicNode = findNodeById(tree, currentPageId);
         if (topicNode) subTree = [topicNode];
       }
-      setGraphData(flattenTreeToGraph(subTree, null, 0));
+      setGraphData(flattenTreeToGraph(Array.isArray(subTree) ? subTree : [], null, 0));
     }
     fetchGraph();
   }, [pathname]);

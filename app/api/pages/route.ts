@@ -3,14 +3,30 @@ import db from "../../../lib/db";
 
 // --- GET: Obtener todas las páginas ---
 export async function GET() {
+  
   try {
     const result = await db.query(`
       SELECT id, title, slug, parent_id, level, content, created_at
       FROM pages
       ORDER BY level ASC, id ASC
+      
     `);
-    return NextResponse.json(result.rows, { status: 200 });
+    // Parsea el contenido JSON antes de retornar
+    const pages = result.rows.map((row: any) => {
+      let parsedContent;
+      try {
+        parsedContent = row.content ? JSON.parse(row.content) : { type: 'doc', content: [] };
+      } catch {
+        parsedContent = row.content || { type: 'doc', content: [] };
+      }
+      return {
+        ...row,
+        content: parsedContent,
+      };
+    });
+    return NextResponse.json(pages, { status: 200 });
   } catch (err) {
+    console.error("Error en GET /api/pages:", err);
     return NextResponse.json({ error: "Error al obtener páginas" }, { status: 500 });
   }
 }

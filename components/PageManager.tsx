@@ -1,6 +1,11 @@
-import React, { useEffect, useState, useRef } from "react";
-import RichTextEditor from "./RichTextEditor";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import RichTextRenderer from "./RichTextRenderer";
+import dynamic from 'next/dynamic';
+
+const RichTextEditor = dynamic(() => import('./RichTextEditor'), {
+  ssr: false,
+  loading: () => <p>Cargando editor...</p> // Optional loading indicator
+});
 
 function buildTree(pages: any[]) {
   const map = new Map();
@@ -57,17 +62,20 @@ function TreeNode({ node, onSelect, selectedId }: { node: any, onSelect: (n: any
 export default function PageManager() {
   const [pages, setPages] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<number|null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); 
+  const [saveLoading, setSaveLoading] = useState(false); 
   const [error, setError] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const selectedPage = pages.find(p => p.id === selectedId);
-  const [draftContent, setDraftContent] = useState<any>(selectedPage?.content || {blocks:[]});
+  const [draftContent, setDraftContent] = useState<any>(selectedPage?.content || { type: 'doc', content: [] });
   const [draftChanged, setDraftChanged] = useState(false);
   const [showSaveNotice, setShowSaveNotice] = useState(false);
   const [showErrorNotice, setShowErrorNotice] = useState<string | false>(false);
-  const draftRef = useRef<any>(null); // Para comparar y restaurar
+  const draftRef = useRef<any>(null); 
   const selectedLevel = selectedPage?.level ?? 0;
   const autosaveTimer = useRef<NodeJS.Timeout|null>(null);
+
+  console.log("[PageManager] Component Mounted");
 
   // Cargar jerarquía desde la API REAL
   useEffect(() => {
@@ -85,57 +93,101 @@ export default function PageManager() {
       });
   }, []);
 
+  // Effect to load selected page content
   useEffect(() => {
-    setDraftContent(selectedPage?.content || {blocks:[]});
+    console.log("[PageManager] Load Effect: Triggered for selectedPage ID:", selectedPage?.id);
+    const newContent = selectedPage?.content || { type: 'doc', content: [] };
+    setDraftContent(newContent);
     setDraftChanged(false);
     setShowSaveNotice(false);
     setShowErrorNotice(false);
-    draftRef.current = selectedPage?.content || {blocks:[]};
+    draftRef.current = newContent; 
+    console.log("[PageManager] Load Effect: draftRef updated to:", JSON.stringify(draftRef.current));
+    console.log("[PageManager] Load Effect: draftChanged set to false");
   }, [selectedPage]);
 
   // --- AUTOSAVE cada 1 minuto si hay cambios ---
+  /* // Disabling autosave as it seems to cause content deletion issues.
   useEffect(() => {
+    console.log(`[PageManager] Autosave Setup: draftChanged=${draftChanged}, saveLoading=${saveLoading}, selectedPage=${!!selectedPage}`);
     if (autosaveTimer.current) clearInterval(autosaveTimer.current);
-    autosaveTimer.current = setInterval(() => {
-      if (draftChanged && !loading && selectedPage) {
-        handleSaveClick();
-      }
-    }, 60000); // 1 minuto
+
+    if (selectedPage) { // Only set interval if a page is selected
+      autosaveTimer.current = setInterval(() => {
+        console.log(`[PageManager] Autosave Check: draftChanged=${draftChanged}, saveLoading=${saveLoading}`);
+        if (draftChanged && !saveLoading) { // Use saveLoading here
+          console.log("[PageManager] AUTOSAVING NOW...");
+          handleSaveClick();
+        }
+      }, 60000); // 1 minuto
+      console.log("[PageManager] Autosave Setup: Interval timer set.");
+    } else {
+      console.log("[PageManager] Autosave Setup: No selected page, interval not set.");
+    }
+
     return () => {
-      if (autosaveTimer.current) clearInterval(autosaveTimer.current);
+      if (autosaveTimer.current) {
+        clearInterval(autosaveTimer.current);
+        console.log("[PageManager] Autosave Cleanup: Interval timer cleared.");
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftChanged, loading, selectedPage]);
+  }, [draftChanged, saveLoading, selectedPage]); // Re-evaluate timer if these change
+  */
 
   // Detecta cambios en el editor
   function handleDraftChange(data: any) {
-    setDraftContent(data);
-    setDraftChanged(JSON.stringify(data) !== JSON.stringify(draftRef.current));
-    setShowSaveNotice(false);
+    console.log("[PageManager] handleDraftChange: Triggered.");
+    const incomingDataString = JSON.stringify(data);
+    const refDataString = JSON.stringify(draftRef.current);
+    const changed = incomingDataString !== refDataString;
+    console.log(`[PageManager] handleDraftChange: Data changed compared to ref? ${changed}`);
+    setDraftContent(data); 
+    setDraftChanged(changed); 
+    setShowSaveNotice(false); 
     setShowErrorNotice(false);
   }
 
-  // Guardado manual
+  // Guardado manual (guarda JSON puro)
   async function handleSaveClick() {
-    if (!selectedPage) return;
-    setLoading(true);
-    const updated = { ...selectedPage, content: draftContent, title: editTitle || selectedPage.title };
-    const res = await fetch("/api/pages", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updated)
-    });
-    if (res.ok) {
-      setPages(pages => pages.map(p => p.id === updated.id ? updated : p));
-      setDraftChanged(false);
-      setShowSaveNotice(true);
-      setTimeout(() => setShowSaveNotice(false), 2000);
-      draftRef.current = draftContent;
-    } else {
-      setShowErrorNotice("Ocurrió un error al guardar. Intenta de nuevo.");
-      setTimeout(() => setShowErrorNotice(false), 3000);
+    if (!selectedPage) {
+      console.warn("[PageManager] handleSaveClick: No selected page, aborting save.");
+      return;
     }
-    setLoading(false);
+    if (saveLoading) {
+      console.warn("[PageManager] handleSaveClick: Save already in progress, aborting.");
+      return;
+    }
+
+    console.log(`[PageManager] handleSaveClick: Starting save for page ID: ${selectedPage.id}`);
+    console.log("[PageManager] handleSaveClick: Content being saved:", JSON.stringify(draftContent)); 
+    setSaveLoading(true);
+    const updated = { ...selectedPage, content: draftContent, title: editTitle || selectedPage.title };
+
+    try {
+      const res = await fetch("/api/pages", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      });
+      if (res.ok) {
+        setPages(pages => pages.map(p => p.id === updated.id ? updated : p));
+        setDraftChanged(false); 
+        setShowSaveNotice(true);
+        setTimeout(() => setShowSaveNotice(false), 2000);
+        draftRef.current = draftContent; 
+        console.log("[PageManager] handleSaveClick: Save successful. draftRef updated, draftChanged set to false.");
+      } else {
+        console.error(`[PageManager] handleSaveClick: Save failed! Status: ${res.status}`);
+        setShowErrorNotice(`Error al guardar (${res.status}). Intenta de nuevo.`);
+      }
+    } catch (error) {
+      console.error("[PageManager] handleSaveClick: Error saving:", error);
+      setShowErrorNotice("Error de red al guardar. Revisa tu conexión.");
+    } finally {
+      setSaveLoading(false); 
+      console.log("[PageManager] handleSaveClick: Save process finished.");
+    }
   }
 
   function handleUndoDraft() {
@@ -198,7 +250,7 @@ export default function PageManager() {
     const slug = title.toLowerCase().replace(/ /g, "-").replace(/[^a-z0-9\-]/g, "");
     const level = levelOverride ?? (parent ? parent.level + 1 : 1);
     const parent_id = parent ? parent.id : null;
-    const newPage = { title, slug, level, parent_id, content: { blocks: [] } };
+    const newPage = { title, slug, level, parent_id, content: { type: 'doc', content: [] } };
     setLoading(true);
     const res = await fetch("/api/pages", {
       method: "POST",
@@ -231,66 +283,74 @@ export default function PageManager() {
   const tree = buildTree(pages);
 
   return (
-    <div style={{ display: "flex", gap: 32, alignItems: "flex-start", minHeight: 400 }}>
-      <div style={{ minWidth: 280 }}>
-        <h2>Jerarquía de Páginas</h2>
-        <div style={{ marginBottom: 16 }}>
-          <button onClick={handleCreateArea} disabled={loading} style={{ marginRight: 6 }}>+ Área</button>
-          <button onClick={handleCreateEspecialidad} disabled={loading} style={{ marginRight: 6 }}>+ Especialidad</button>
-          <button onClick={handleCreateTema} disabled={loading} style={{ marginRight: 6 }}>+ Tema</button>
-          <button onClick={handleCreateContenido} disabled={loading}>+ Contenido</button>
-        </div>
-        {loading && <div style={{ color: "#888" }}>Cargando...</div>}
-        {error && <div style={{ color: "red" }}>{error}</div>}
-        <div>
-          {tree.map((node: any) => (
-            <TreeNode key={node.id} node={node} onSelect={handleSelectNodeWithGuard} selectedId={selectedId ?? -1} />
-          ))}
-        </div>
+    <div style={{ display: "flex", height: "calc(100vh - 100px)" }}>
+      {/* Sidebar */} 
+      <div style={{ width: 300, borderRight: "1px solid #ccc", padding: 10, overflowY: "auto" }}>
+        <h2>Jerarquía</h2>
+        {loading && <p>Cargando árbol...</p>}
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+        {!loading && !error && pages.length > 0 && (
+          tree.map(rootNode => (
+            <TreeNode key={rootNode.id} node={rootNode} onSelect={handleSelectNodeWithGuard} selectedId={selectedId!} />
+          ))
+        )}
+         <hr style={{ margin: '15px 0' }}/>
+         {/* Botones para crear nuevos elementos */} 
+         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+           <button onClick={handleCreateArea}>+ Nueva Área</button>
+           {/* Show Especialidad button if a level 1+ item is selected, enable only if level 1 is selected */}
+           {selectedLevel >= 1 && <button onClick={handleCreateEspecialidad} disabled={selectedLevel !== 1}>+ Nueva Especialidad</button>}
+           {/* Show Tema button if a level 2+ item is selected, enable only if level 2 is selected */}
+           {selectedLevel >= 2 && <button onClick={handleCreateTema} disabled={selectedLevel !== 2}>+ Nuevo Tema</button>}
+           {/* Show Contenido button if a level 3+ item is selected, enable only if level 3 is selected */}
+           {selectedLevel >= 3 && <button onClick={handleCreateContenido} disabled={selectedLevel !== 3}>+ Nuevo Contenido</button>}
+         </div>
       </div>
-      <div style={{ flex: 1, minWidth: 320 }}>
+
+      {/* Editor Area */} 
+      <div style={{ flex: 1, padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {selectedPage ? (
-          <div>
-            <div style={{ marginBottom: 12 }}>
-              <input
-                value={editTitle}
-                onChange={e => setEditTitle(e.target.value)}
-                placeholder={selectedPage.title}
-                style={{ fontSize: 20, fontWeight: 600, border: '1px solid #ccc', borderRadius: 6, padding: '4px 10px', marginRight: 12 }}
+          <>
+            <input
+              type="text"
+              value={editTitle || selectedPage.title}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={handleSaveClick} // Save title on blur maybe?
+              style={{ fontSize: '1.5em', fontWeight: 'bold', marginBottom: 15, padding: '5px', border: '1px solid #ddd', borderRadius: '4px' }}
+            />
+            <div style={{ flex: 1 /* Make editor container fill space */ }}>
+              <RichTextEditor
+                key={selectedPage.id} // Ensure editor re-mounts cleanly on page change
+                content={draftContent}
+                onChange={handleDraftChange}
               />
-              <span style={{ color: '#888', fontSize: 14 }}>
-                [{getTypeByLevel(selectedPage.level)}]
-              </span>
-              <button onClick={() => handleDelete(selectedPage)} style={{ color: 'red', border: 'none', background: 'transparent', fontSize: 20, cursor: 'pointer', marginLeft: 8 }}>🗑️</button>
             </div>
-            <RichTextEditor key={selectedPage?.id} data={draftContent} onChange={handleDraftChange} />
-            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <button onClick={handleSaveClick} disabled={loading || !draftChanged} style={{marginRight:8}}>Guardar cambios</button>
-              <button onClick={handleUndoDraft} disabled={loading || !draftChanged}>Deshacer cambios</button>
-              {/* AVISO DE CAMBIOS SIN GUARDAR ELIMINADO PARA NO INTERRUMPIR EL FOCO DE ESCRITURA */}
-              {showSaveNotice && <span style={{color:'#27ae60',marginLeft:8}}>¡Cambios guardados!</span>}
-              {showErrorNotice && <span style={{color:'#c00',marginLeft:8}}>{showErrorNotice}</span>}
+            <div style={{ marginTop: 15, display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button onClick={handleSaveClick} disabled={!draftChanged || saveLoading}>
+                {saveLoading ? "Guardando..." : "Guardar Cambios"}
+              </button>
+              <button onClick={handleUndoDraft} disabled={!draftChanged || saveLoading}>Descartar</button>
+              {showSaveNotice && <span style={{ color: 'green' }}>Guardado ✓</span>}
+              {showErrorNotice && <span style={{ color: 'red' }}>{showErrorNotice}</span>}
+              {!draftChanged && !showSaveNotice && !showErrorNotice && <span style={{ color: '#888' }}>Contenido al día</span>}
             </div>
-            {/* Vista previa eliminada para evitar pérdida de foco y mejorar la experiencia de edición */}
-            {/* <div style={{ marginTop: 18, background: "#fafafa", padding: 18, borderRadius: 8 }}>
-              <div style={{ fontWeight: 500, marginBottom: 6 }}>Vista previa</div>
-              <RichTextRenderer data={draftContent} />
-            </div> */}
-          </div>
+          </>
         ) : (
-          <div style={{ color: '#888' }}>Selecciona una página para editar</div>
+          <p>Selecciona una página del árbol para ver o editar su contenido.</p>
         )}
       </div>
-      {/* Modal de confirmación para cambios sin guardar */}
+
+      {/* Modal de confirmación */}
       {showUnsavedModal && (
-        <div style={{ position: 'fixed', top:0, left:0, width:'100vw', height:'100vh', background:'#0009', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ background:'#fff', padding:32, borderRadius:12, minWidth:320, boxShadow:'0 4px 24px #0002', textAlign:'center' }}>
-            <div style={{ fontSize:18, marginBottom:18 }}>Tienes cambios sin guardar.<br/>¿Deseas descartarlos y cambiar de página?</div>
-            <button onClick={confirmChangePage} style={{marginRight:16}}>Descartar cambios</button>
-            <button onClick={cancelChangePage}>Cancelar</button>
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', padding: '30px', border: '1px solid #ccc', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', zIndex: 1001 }}>
+              <h3>Cambios sin guardar</h3>
+              <p>Tienes cambios sin guardar. ¿Quieres descartarlos y cambiar de página?</p>
+              <button onClick={confirmChangePage} style={{ marginRight: 10 }}>Sí, descartar</button>
+              <button onClick={cancelChangePage}>No, cancelar</button>
           </div>
-        </div>
       )}
+      {showUnsavedModal && <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000 }} onClick={cancelChangePage}></div>} 
+
     </div>
   );
 }

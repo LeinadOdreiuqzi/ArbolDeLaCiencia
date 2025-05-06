@@ -73,10 +73,10 @@ export default function PageHierarchyEditor() {
       </div>
       <div style={{ flex: 1 }}>
         <h3 style={{ marginBottom: 8 }}>{selectedPage?.title}</h3>
-        <RichTextEditor data={selectedPage?.content} onChange={handleContentChange} />
+        <RichTextEditor content={selectedPage?.content} onChange={handleContentChange} />
         <div style={{ marginTop: 18, background: "#fafafa", padding: 18, borderRadius: 8 }}>
           <div style={{ fontWeight: 500, marginBottom: 6 }}>Vista previa</div>
-          <RichTextRenderer data={selectedPage?.content} />
+          <RichTextRenderer content={selectedPage?.content} />
         </div>
         <div style={{ marginTop: 16 }}>
           <div style={{ fontWeight: 500, marginBottom: 4 }}>JSON generado para la base de datos:</div>
