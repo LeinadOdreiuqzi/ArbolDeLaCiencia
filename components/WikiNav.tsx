@@ -71,6 +71,8 @@ function TopicDropdown({ node }: { node: TopicNode }) {
   );
 }
 
+import TextSizeControls from './TextSizeControls';
+
 export default function WikiNav({ navOpen, setNavOpen, ThemeToggle }: { navOpen: boolean; setNavOpen: (open: boolean) => void; ThemeToggle: React.ComponentType; }) {
   const [tree, setTree] = useState<TopicNode[] | null>(null);
   useEffect(() => {
@@ -107,7 +109,10 @@ export default function WikiNav({ navOpen, setNavOpen, ThemeToggle }: { navOpen:
         {navOpen ? "←" : "→"}
       </button>
       <div style={{ display: navOpen ? "block" : "none" }}>
-        <ThemeToggle />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <ThemeToggle />
+          <TextSizeControls />
+        </div>
         <nav aria-label="Wiki Topics">
           <h2 style={{ fontSize: "1.1em", marginBottom: 12, fontWeight: 600 }}>Topics & Subtopics</h2>
           {tree ? (

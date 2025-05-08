@@ -5,11 +5,43 @@ import "./globals.css";
 import LargeKnowledgeGraph from "../../components/LargeKnowledgeGraph";
 import ThemeToggle from "../../components/ThemeToggle";
 import WikiHeadingsLinks from "../../components/WikiHeadingsLinks";
+import ReadingProgressBar from "../../components/ReadingProgressBar";
+import Pagination from "../../components/Pagination";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { pagesToTree, TopicNode } from "@/lib/notes-graph-util";
 import RichTextRenderer from "@/components/RichTextRenderer";
+
+/**
+ * Función auxiliar para paginar el contenido
+ * @param content - El contenido completo en formato JSON
+ * @param currentPage - La página actual
+ * @param pageSize - El tamaño de página (elementos por página)
+ * @returns Una porción del contenido correspondiente a la página actual
+ */
+function getPaginatedContent(content: any, currentPage: number, pageSize: number) {
+  // Esta es una implementación simplificada
+  // En una implementación real, se dividiría el contenido de manera más inteligente
+  // por ejemplo, por párrafos o secciones
+  
+  if (!content || !content.content || !Array.isArray(content.content)) {
+    return content;
+  }
+  
+  // Dividir el contenido en "páginas" basadas en el número de nodos de nivel superior
+  const totalItems = content.content.length;
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  
+  // Crear una copia del contenido con solo los elementos de la página actual
+  const paginatedContent = {
+    ...content,
+    content: content.content.slice(startIndex, endIndex)
+  };
+  
+  return paginatedContent;
+}
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,9 +78,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [error, setError] = useState<string | null>(null);
   // Control state for navigation panel visibility
   const [navOpen, setNavOpen] = useState(true);
+  // Estado para la paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(10); // Número de elementos por página
+  const router = useRouter();
   
   // Define grid columns based on graph panel state
-  const gridColumns = `1fr ${graphOpen ? '340px' : '0'}`; // Main content + Graph panel width
   const pathname = usePathname();
   const slug = pathname.split("/").filter(Boolean)[1] || null;
 
@@ -72,6 +108,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   // Find the selected node based on the current URL slug
   const selected = findNodeBySlug(tree, slug);
+  
+  // Calcular el número total de páginas cuando cambia el contenido seleccionado
+  useEffect(() => {
+    if (selected && selected.content) {
+      // Estimación simple: si el contenido tiene más de X caracteres, dividirlo en páginas
+      // Esto es una aproximación, en una implementación real se podría usar un enfoque más sofisticado
+      const contentLength = JSON.stringify(selected.content).length;
+      const estimatedPages = Math.max(1, Math.ceil(contentLength / 10000)); // 10000 caracteres por página
+      setTotalPages(estimatedPages);
+      setCurrentPage(1); // Resetear a la primera página cuando cambia el contenido
+    } else {
+      setTotalPages(1);
+    }
+  }, [selected]);
 
   // Development debug logs
   if (process.env.NODE_ENV === 'development' && typeof window !== "undefined") {
@@ -81,7 +131,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <div className={`wiki-layout ${geistSans.variable} ${geistMono.variable} antialiased`} style={{ gridTemplateColumns: gridColumns, position: 'relative' }}>
+    <div className={`wiki-layout ${geistSans.variable} ${geistMono.variable} antialiased`} 
+      style={{ 
+        position: 'relative', 
+        width: '100%', 
+        display: 'grid',
+        gridTemplateColumns: `${navOpen ? '260px' : '0'} 1fr ${graphOpen ? '340px' : '0'}`,
+        gridTemplateAreas: '"nav main graph"',
+        minHeight: '100vh',
+        transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+      }}>
+      <ReadingProgressBar />
       {/* Botón de toggle para el panel izquierdo, ahora fuera del aside */}
       <button
         className="wiki-nav-toggle-fixed"
@@ -111,17 +171,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <aside 
         className={`wiki-nav scrollable-fixed-panel`}
         style={{
+          gridArea: 'nav',
           position: "fixed",
           top: 0,
           left: 0,
           bottom: 0,
-          width: "260px",
-          transform: navOpen ? "translateX(0)" : "translateX(-100%)",
-          transition: "transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+          width: navOpen ? "260px" : "0",
+          overflow: navOpen ? "auto" : "hidden",
+          opacity: navOpen ? 1 : 0,
+          visibility: navOpen ? "visible" : "hidden",
+          transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
           zIndex: 10, 
-          overflowY: 'auto',
           background: 'var(--nav-bg)',
-          boxShadow: '2px 0 8px rgba(0,0,0,0.15)'
+          boxShadow: navOpen ? '2px 0 8px rgba(0,0,0,0.15)' : 'none'
         }}
       >
         <div style={{ paddingTop: '20px' }}> {/* Reducido el padding superior ya que el botón está fuera */}
@@ -140,7 +202,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </nav>
         </div>
       </aside>
-      <main className="wiki-main" style={{ paddingTop: '1rem', width: '100%', marginLeft: '0' /* El contenido principal ahora ocupa todo el ancho disponible */ }}>
+      <main className="wiki-main" style={{ 
+          gridArea: 'main',
+          padding: '1rem 40px',
+          width: '100%',
+          boxSizing: 'border-box',
+          transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "#888" }}>Loading content...</div>
         ) : error ? (
@@ -152,21 +220,35 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <h3>{selected.label}</h3>
             {/* Pass the entire content object if it's the Tiptap JSON */}
             {selected.content
-              ? <RichTextRenderer content={selected.content} /> 
+              ? <RichTextRenderer 
+                  content={getPaginatedContent(selected.content, currentPage, pageSize)} 
+                /> 
               : <em>No content available</em>
             }
+            {/* Componente de paginación para contenido extenso */}
+            {selected.content && totalPages > 1 && (
+              <Pagination 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={(page) => {
+                  setCurrentPage(page);
+                  // Aquí se podría implementar la lógica para cargar solo una parte del contenido
+                  // basado en la página actual
+                  window.scrollTo(0, 0); // Resetear scroll para que la barra de progreso funcione correctamente
+                }}
+              />
+            )}
           </div>
         ) : (
           children
         )}
       </main>
-      {/* Botón para toggle del panel derecho */}
       <button 
         onClick={() => setGraphOpen(!graphOpen)}
         style={{
           position: 'fixed',
           top: '12px',
-          right: graphOpen ? '350px' : '10px', // Ajustar posición basado en si el panel está abierto
+          right: graphOpen ? '350px' : '10px',
           zIndex: 100,
           background: "var(--nav-bg)",
           border: "1px solid var(--border)",
@@ -188,14 +270,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <aside 
         className="wiki-graph scrollable-sticky-panel" 
         style={{
-          position: 'sticky',
-          top: '0', // Para que sea sticky desde la parte superior
-          height: '100vh', // Ocupa toda la altura de la ventana
-          overflowY: 'auto',
+          gridArea: 'graph',
+          position: 'fixed',
+          top: '0',
+          right: '0',
+          height: '100vh',
           width: graphOpen ? '340px' : '0',
+          overflow: graphOpen ? 'auto' : 'hidden',
+          padding: graphOpen ? '50px 15px 15px 15px' : '0',
           transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
           visibility: graphOpen ? 'visible' : 'hidden',
-          paddingTop: '50px' // Espacio para el botón de toggle si se quiere dentro
+          opacity: graphOpen ? '1' : '0',
+          zIndex: 50,
+          boxShadow: graphOpen ? '-2px 0 8px rgba(0,0,0,0.1)' : 'none'
         }}
       >
         <LargeKnowledgeGraph />

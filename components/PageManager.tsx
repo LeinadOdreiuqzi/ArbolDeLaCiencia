@@ -319,6 +319,9 @@ export default function PageManager() {
               style={{ fontSize: '1.5em', fontWeight: 'bold', marginBottom: 15, padding: '5px', border: '1px solid #ddd', borderRadius: '4px' }}
             />
             <div style={{ flex: 1 /* Make editor container fill space */ }}>
+              <div style={{ marginBottom: '10px', padding: '8px', backgroundColor: '#f0f7ff', borderRadius: '4px', fontSize: '0.9em' }}>
+                <strong>Nota:</strong> El contenido extenso se paginará automáticamente en la visualización. No es necesario dividir manualmente el contenido en páginas.
+              </div>
               <RichTextEditor
                 key={selectedPage.id} // Ensure editor re-mounts cleanly on page change
                 content={draftContent}
