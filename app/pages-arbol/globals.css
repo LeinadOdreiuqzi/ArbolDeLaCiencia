@@ -6,6 +6,8 @@
   --nav-bg: #f7f7fa;
   --aside-bg: #fafbff;
   --border: #e0e0e0;
+  --muted-foreground: #52525b; /* Tailwind zinc-600 */
+  --accent-color: #2563eb; /* Tailwind blue-600 */
 }
 
 /* Removed @theme inline block as it is not valid CSS */
@@ -16,6 +18,8 @@
   --nav-bg: #232329;
   --aside-bg: #20212b;
   --border: #23232c;
+  --muted-foreground: #a1a1aa; /* Tailwind zinc-400 */
+  --accent-color: #60a5fa; /* Tailwind blue-400 */
 }
 
 body {

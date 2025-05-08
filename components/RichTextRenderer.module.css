@@ -1,7 +1,7 @@
 .rich-text-content {
   font-family: var(--font-geist-sans);
   line-height: 1.6;
-  color: var(--foreground-rgb, #333);
+  color: var(--foreground); /* Changed from var(--foreground-rgb, #333) */
 }
 
 .rich-text-content h1,
@@ -26,14 +26,14 @@
 }
 
 .rich-text-content blockquote {
-  border-left: 3px solid var(--accent-color, #3b82f6);
+  border-left: 3px solid var(--accent-color); /* Use defined --accent-color */
   padding-left: 1em;
   margin-left: 0;
-  color: var(--muted-foreground, #6b7280);
+  color: var(--muted-foreground); /* Use defined --muted-foreground */
 }
 
 .rich-text-content a {
-  color: var(--accent-color, #3b82f6);
+  color: var(--accent-color); /* Use defined --accent-color */
   text-decoration: none;
 }
 
@@ -43,6 +43,6 @@
 
 .rich-text-empty {
   font-style: italic;
-  color: var(--muted-foreground, #6b7280);
+  color: var(--muted-foreground); /* Use defined --muted-foreground */
   padding: 1rem 0;
-} 
+}
