@@ -91,22 +91,22 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-size: 1.18rem;
-  line-height: 1.7;
+  line-height: 1.7lh;
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(60,60,60,0.04);
-  margin: 2rem 0;
+  margin: 2lh 0;
 }
 
 .wiki-main h1, .wiki-main h2, .wiki-main h3 {
   font-family: 'Geist', Arial, Helvetica, sans-serif;
   font-weight: bold;
-  margin-top: 2.2rem;
-  margin-bottom: 1.1rem;
+  margin-top: 2.2lh;
+  margin-bottom: 1.1lh;
 }
 
 .wiki-main ul, .wiki-main ol {
-  margin-left: 1.5rem;
-  margin-bottom: 1.3rem;
+  margin-left: 1.5lh;
+  margin-bottom: 1.3lh;
 }
 
 .wiki-main a {
@@ -127,9 +127,9 @@ body {
 
 .wiki-main blockquote {
   border-left: 4px solid #0a6cff;
-  padding-left: 1rem;
+  padding-left: 1lh;
   color: #555;
-  margin: 1.5rem 0;
+  margin: 1.5lh 0;
   background: #f7faff;
   border-radius: 6px;
 }
