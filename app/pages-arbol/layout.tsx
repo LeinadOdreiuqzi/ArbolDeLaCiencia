@@ -21,24 +21,213 @@ import RichTextRenderer from "@/components/RichTextRenderer";
  * @returns Una porción del contenido correspondiente a la página actual
  */
 function getPaginatedContent(content: any, currentPage: number, pageSize: number) {
-  // Esta es una implementación simplificada
-  // En una implementación real, se dividiría el contenido de manera más inteligente
-  // por ejemplo, por párrafos o secciones
-  
+  // Verificar si el contenido es válido
   if (!content || !content.content || !Array.isArray(content.content)) {
     return content;
   }
   
-  // Dividir el contenido en "páginas" basadas en el número de nodos de nivel superior
-  const totalItems = content.content.length;
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  // Análisis más detallado del contenido para determinar si necesita paginación
+  const contentLength = content.content.length;
+  
+  // Calculamos la complejidad y el tamaño en caracteres de cada elemento individualmente
+  const itemComplexities: number[] = [];
+  const itemCharCounts: number[] = [];
+  let totalComplexity = 0;
+  let totalCharCount = 0;
+  
+  // Función para contar caracteres en un elemento de contenido
+  const countCharsInItem = (item: any): number => {
+    let charCount = 0;
+    
+    // Contar caracteres en el texto del elemento
+    if (item.text) {
+      charCount += item.text.length;
+    }
+    
+    // Contar caracteres en el contenido anidado
+    if (item.content && Array.isArray(item.content)) {
+      item.content.forEach((nestedItem: any) => {
+        charCount += countCharsInItem(nestedItem);
+      });
+    }
+    
+    return charCount;
+  };
+  
+  // Recorremos los elementos para evaluar su complejidad y contar caracteres
+  content.content.forEach((item: any, index: number) => {
+    let itemComplexity = 0;
+    const charCount = countCharsInItem(item);
+    itemCharCounts[index] = charCount;
+    totalCharCount += charCount;
+    
+    // Si el elemento tiene contenido anidado, calculamos su complejidad
+    if (item.content && Array.isArray(item.content) && item.content.length > 0) {
+      // Damos más peso a elementos con contenido anidado extenso
+      itemComplexity += item.content.length * 1.5;
+      
+      // Analizamos también la complejidad del contenido anidado
+      item.content.forEach((nestedItem: any) => {
+        if (nestedItem.text && nestedItem.text.length > 50) {
+          itemComplexity += Math.floor(nestedItem.text.length / 50);
+        }
+      });
+    } else {
+      // Para elementos simples, asignamos un valor base
+      itemComplexity += 1;
+    }
+    
+    // Si el elemento tiene texto extenso, aumentamos la complejidad
+    if (item.text && item.text.length > 50) {
+      itemComplexity += Math.floor(item.text.length / 50);
+    }
+    
+    // Consideramos el tipo de elemento para ajustar la complejidad
+    if (item.type === 'heading') {
+      // Los encabezados suelen indicar secciones nuevas, les damos más peso
+      itemComplexity += 2;
+    } else if (item.type === 'image') {
+      // Las imágenes ocupan más espacio visual
+      itemComplexity += 3;
+    }
+    
+    itemComplexities[index] = itemComplexity;
+    totalComplexity += itemComplexity;
+  });
+  
+  // Umbral de paginación basado en caracteres (15,000 caracteres por página)
+  const charThreshold = 15000;
+  
+  // También mantenemos un umbral de complejidad como respaldo
+  const complexityThreshold = pageSize * 25; // Aumentamos significativamente el umbral
+  
+  if (contentLength <= 5 || totalCharCount < charThreshold && totalComplexity < complexityThreshold) {
+    // Contenido pequeño o simple, no lo paginamos
+    return content;
+  }
+  
+  // Calculamos el número ideal de páginas basado en el conteo de caracteres
+  const idealPageCount = Math.max(1, Math.ceil(totalCharCount / charThreshold));
+  
+  // Distribuimos el contenido de manera más equilibrada
+  const pagesComplexity: number[] = new Array(idealPageCount).fill(0);
+  const pagesCharCount: number[] = new Array(idealPageCount).fill(0);
+  const pagesContent: any[][] = new Array(idealPageCount).fill(null).map(() => []);
+  
+  // Identificamos los tipos de elementos que indican el inicio de una sección
+  const isSectionStart = (item: any): boolean => {
+    return item.type === 'heading';
+  };
+  
+  // Identificamos los tipos de elementos que no deberían cortarse
+  const shouldKeepWithNext = (item: any, nextItem: any): boolean => {
+    // No separar un encabezado del contenido que le sigue
+    if (item.type === 'heading') return true;
+    
+    // No separar elementos que forman parte de una lista
+    if (item.type === 'bulletList' || item.type === 'orderedList') {
+      return nextItem && (nextItem.type === 'bulletList' || nextItem.type === 'orderedList');
+    }
+    
+    // No separar párrafos cortos (menos de 200 caracteres) del siguiente elemento
+    if (item.type === 'paragraph') {
+      const charCount = itemCharCounts[content.content.indexOf(item)];
+      return charCount < 200;
+    }
+    
+    return false;
+  };
+  
+  // Asignamos elementos a páginas intentando equilibrar el conteo de caracteres
+  // y respetando los límites naturales del contenido
+  let currentPageIndex = 0;
+  let lastSectionStartIndex = 0;
+  
+  content.content.forEach((item: any, index: number) => {
+    const isLastItem = index === content.content.length - 1;
+    const nextItem = !isLastItem ? content.content[index + 1] : null;
+    
+    // Si encontramos el inicio de una nueva sección, lo marcamos
+    if (isSectionStart(item)) {
+      lastSectionStartIndex = index;
+    }
+    
+    // Verificamos si debemos cambiar de página
+    const wouldExceedThreshold = 
+      pagesCharCount[currentPageIndex] + itemCharCounts[index] > charThreshold &&
+      pagesContent[currentPageIndex].length > 0;
+    
+    // Solo cambiamos de página si:
+    // 1. Excederíamos el umbral de caracteres
+    // 2. No estamos en medio de una sección que debería mantenerse junta
+    // 3. No es el último elemento (siempre incluimos el último elemento en la última página)
+    if (wouldExceedThreshold && !isLastItem && !shouldKeepWithNext(item, nextItem)) {
+      // Si hay un inicio de sección reciente y no estamos muy lejos de él,
+      // retrocedemos para comenzar la nueva página desde ese punto
+      if (lastSectionStartIndex > 0 && 
+          index - lastSectionStartIndex < 5 && 
+          lastSectionStartIndex > pagesContent[currentPageIndex][0]) {
+        
+        // Movemos los elementos desde el inicio de la sección a la siguiente página
+        const elementsToMove = content.content.slice(lastSectionStartIndex, index + 1);
+        
+        // Eliminamos estos elementos de la página actual
+        pagesContent[currentPageIndex] = pagesContent[currentPageIndex].filter(
+          (_, i) => content.content.indexOf(_) < lastSectionStartIndex
+        );
+        
+        // Actualizamos los contadores de la página actual
+        pagesCharCount[currentPageIndex] = pagesContent[currentPageIndex].reduce(
+          (sum, item) => sum + itemCharCounts[content.content.indexOf(item)], 0
+        );
+        pagesComplexity[currentPageIndex] = pagesContent[currentPageIndex].reduce(
+          (sum, item) => sum + itemComplexities[content.content.indexOf(item)], 0
+        );
+        
+        // Avanzamos a la siguiente página
+        currentPageIndex++;
+        
+        // Agregamos los elementos movidos a la nueva página
+        elementsToMove.forEach((movedItem: any) => {
+          const movedItemIndex = content.content.indexOf(movedItem);
+          pagesContent[currentPageIndex].push(movedItem);
+          pagesCharCount[currentPageIndex] += itemCharCounts[movedItemIndex];
+          pagesComplexity[currentPageIndex] += itemComplexities[movedItemIndex];
+        });
+      } else {
+        // Simplemente avanzamos a la siguiente página
+        currentPageIndex++;
+        pagesContent[currentPageIndex].push(item);
+        pagesCharCount[currentPageIndex] += itemCharCounts[index];
+        pagesComplexity[currentPageIndex] += itemComplexities[index];
+      }
+    } else {
+      // Agregamos el elemento a la página actual
+      pagesContent[currentPageIndex].push(item);
+      pagesCharCount[currentPageIndex] += itemCharCounts[index];
+      pagesComplexity[currentPageIndex] += itemComplexities[index];
+    }
+  });
+  
+  // Eliminamos páginas vacías si las hay
+  const filteredPagesContent = pagesContent.filter(page => page.length > 0);
+  
+  // Obtenemos el contenido para la página solicitada
+  const pageIndex = Math.min(currentPage - 1, filteredPagesContent.length - 1);
   
   // Crear una copia del contenido con solo los elementos de la página actual
   const paginatedContent = {
     ...content,
-    content: content.content.slice(startIndex, endIndex)
+    content: filteredPagesContent[pageIndex] || []
   };
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Pagination] Content length: ${contentLength}, Total chars: ${totalCharCount}, Total complexity: ${totalComplexity}`);
+    console.log(`[Pagination] Char threshold: ${charThreshold}, Ideal page count: ${idealPageCount}, Current page: ${currentPage}`);
+    console.log(`[Pagination] Page char counts:`, pagesCharCount.filter((_, i) => filteredPagesContent[i]?.length > 0));
+    console.log(`[Pagination] Page complexities:`, pagesComplexity.filter((_, i) => filteredPagesContent[i]?.length > 0));
+    console.log(`[Pagination] Items per page:`, filteredPagesContent.map(p => p.length));
+  }
   
   return paginatedContent;
 }
@@ -111,17 +300,100 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   
   // Calcular el número total de páginas cuando cambia el contenido seleccionado
   useEffect(() => {
-    if (selected && selected.content) {
-      // Estimación simple: si el contenido tiene más de X caracteres, dividirlo en páginas
-      // Esto es una aproximación, en una implementación real se podría usar un enfoque más sofisticado
-      const contentLength = JSON.stringify(selected.content).length;
-      const estimatedPages = Math.max(1, Math.ceil(contentLength / 10000)); // 10000 caracteres por página
-      setTotalPages(estimatedPages);
+    if (selected && selected.content && selected.content.content && Array.isArray(selected.content.content)) {
+      const contentLength = selected.content.content.length;
+      
+      // Función para contar caracteres en un elemento de contenido
+      const countCharsInItem = (item: any): number => {
+        let charCount = 0;
+        
+        // Contar caracteres en el texto del elemento
+        if (item.text) {
+          charCount += item.text.length;
+        }
+        
+        // Contar caracteres en el contenido anidado
+        if (item.content && Array.isArray(item.content)) {
+          item.content.forEach((nestedItem: any) => {
+            charCount += countCharsInItem(nestedItem);
+          });
+        }
+        
+        return charCount;
+      };
+      
+      // Calculamos la complejidad y el tamaño en caracteres de cada elemento
+      const itemComplexities: number[] = [];
+      const itemCharCounts: number[] = [];
+      let totalComplexity = 0;
+      let totalCharCount = 0;
+      
+      // Recorremos los elementos para evaluar su complejidad y contar caracteres
+      selected.content.content.forEach((item: any, index: number) => {
+        let itemComplexity = 0;
+        const charCount = countCharsInItem(item);
+        itemCharCounts[index] = charCount;
+        totalCharCount += charCount;
+        
+        // Si el elemento tiene contenido anidado, calculamos su complejidad
+        if (item.content && Array.isArray(item.content) && item.content.length > 0) {
+          // Damos más peso a elementos con contenido anidado extenso
+          itemComplexity += item.content.length * 1.5;
+          
+          // Analizamos también la complejidad del contenido anidado
+          item.content.forEach((nestedItem: any) => {
+            if (nestedItem.text && nestedItem.text.length > 50) {
+              itemComplexity += Math.floor(nestedItem.text.length / 50);
+            }
+          });
+        } else {
+          // Para elementos simples, asignamos un valor base
+          itemComplexity += 1;
+        }
+        
+        // Si el elemento tiene texto extenso, aumentamos la complejidad
+        if (item.text && item.text.length > 50) {
+          itemComplexity += Math.floor(item.text.length / 50);
+        }
+        
+        // Consideramos el tipo de elemento para ajustar la complejidad
+        if (item.type === 'heading') {
+          // Los encabezados suelen indicar secciones nuevas, les damos más peso
+          itemComplexity += 2;
+        } else if (item.type === 'image') {
+          // Las imágenes ocupan más espacio visual
+          itemComplexity += 3;
+        }
+        
+        itemComplexities[index] = itemComplexity;
+        totalComplexity += itemComplexity;
+      });
+      
+      // Umbral de paginación basado en caracteres (15,000 caracteres por página)
+      const charThreshold = 15000;
+      
+      // También mantenemos un umbral de complejidad como respaldo
+      const complexityThreshold = pageSize * 25; // Aumentamos significativamente el umbral
+      
+      if (contentLength <= 5 || (totalCharCount < charThreshold && totalComplexity < complexityThreshold)) {
+        // Contenido pequeño o simple, no lo paginamos
+        setTotalPages(1);
+      } else {
+        // Calculamos el número ideal de páginas basado en el conteo de caracteres
+        const idealPageCount = Math.max(1, Math.ceil(totalCharCount / charThreshold));
+        setTotalPages(idealPageCount);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[Layout] Content length: ${contentLength}, Total chars: ${totalCharCount}, Total complexity: ${totalComplexity}`);
+          console.log(`[Layout] Char threshold: ${charThreshold}, Ideal page count: ${idealPageCount}`);
+        }
+      }
+      
       setCurrentPage(1); // Resetear a la primera página cuando cambia el contenido
     } else {
       setTotalPages(1);
     }
-  }, [selected]);
+  }, [selected, pageSize]);
 
   // Development debug logs
   if (process.env.NODE_ENV === 'development' && typeof window !== "undefined") {
