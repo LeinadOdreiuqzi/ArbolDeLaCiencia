@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { pagesToTree, TopicNode } from "@/lib/notes-graph-util";
 import RichTextRenderer from "@/components/RichTextRenderer";
+import PageHierarchyNavigation from "@/components/PageHierarchyNavigation";
 
 /**
  * Función auxiliar para paginar el contenido
@@ -271,7 +272,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [pageSize, setPageSize] = useState(10); // Número de elementos por página
+  const [theme, setTheme] = useState<"dark" | "light">("light");
   const router = useRouter();
+  
+  // Detectar el tema actual
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedTheme = localStorage.getItem("theme") as "dark" | "light" | null;
+      if (storedTheme) setTheme(storedTheme);
+      
+      // Observar cambios en el tema
+      const handleThemeChange = () => {
+        const currentTheme = document.documentElement.getAttribute("data-theme") as "dark" | "light";
+        setTheme(currentTheme || "light");
+      };
+      
+      window.addEventListener("storage", handleThemeChange);
+      const observer = new MutationObserver(handleThemeChange);
+      observer.observe(document.documentElement, { attributes: true });
+      
+      return () => {
+        window.removeEventListener("storage", handleThemeChange);
+        observer.disconnect();
+      };
+    }
+  }, []);
   
   // Define grid columns based on graph panel state
   const pathname = usePathname();
@@ -458,19 +483,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           boxShadow: navOpen ? '2px 0 8px rgba(0,0,0,0.15)' : 'none'
         }}
       >
-        <div style={{ paddingTop: '20px' }}> {/* Reducido el padding superior ya que el botón está fuera */}
-          <ThemeToggle />
-          <nav aria-label="Wiki Topics">
-            <h2 style={{ fontSize: "1.1em", marginBottom: 12, fontWeight: 600 }}>Topics y Subtopics</h2>
+        <div style={{ paddingTop: '20px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '0 12px 16px 12px' }}>
+            <ThemeToggle />
+            <h2 style={{ fontSize: "1.1em", marginBottom: 12, fontWeight: 600, padding: '0 8px' }}>Topics y Subtopics</h2>
             {/* Botón para ir a la página principal */}
             <Link 
               href="/pages-arbol"
+              className="home-wiki-button"
               style={{
-                //display: "block",
                 padding: "10px 14px",
-                margin: "0 0 16px 0",
-                background: "var(--primary-color-light, #e0f2fe)",
-                color: "var(--primary-color, #2563eb)",
+                margin: "0 0 16px 8px",
+                background: theme === "dark" ? "var(--primary-color-dark, #1e3a8a)" : "var(--primary-color-light, #e0f2fe)",
+                color: theme === "dark" ? "var(--text-on-dark, #e0f2fe)" : "var(--primary-color, #2563eb)",
                 borderRadius: "8px",
                 textDecoration: "none",
                 textAlign: "center",
@@ -478,22 +503,32 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 fontSize: "0.95rem",
                 letterSpacing: "0.3px",
                 transition: "all 0.3s ease",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                border: "1px solid var(--primary-color-lighter, #bfdbfe)",
+                boxShadow: theme === "dark" ? "0 2px 4px rgba(0,0,0,0.2)" : "0 2px 4px rgba(0,0,0,0.05)",
+                border: theme === "dark" ? "1px solid var(--primary-color-dark, #1e40af)" : "1px solid var(--primary-color-lighter, #bfdbfe)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "6px"
+                gap: "6px",
+                maxWidth: "100%",
+                width: "fit-content"
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--primary-color-lighter, #bfdbfe)";
+                e.currentTarget.style.background = theme === "dark" 
+                  ? "var(--primary-color-darker, #1e40af)" 
+                  : "var(--primary-color-lighter, #bfdbfe)";
                 e.currentTarget.style.transform = "translateY(-1px)";
-                e.currentTarget.style.boxShadow = "0 4px 8px rgba(0,0,0,0.08)";
+                e.currentTarget.style.boxShadow = theme === "dark" 
+                  ? "0 4px 8px rgba(0,0,0,0.3)" 
+                  : "0 4px 8px rgba(0,0,0,0.08)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "var(--primary-color-light, #e0f2fe)";
+                e.currentTarget.style.background = theme === "dark" 
+                  ? "var(--primary-color-dark, #1e3a8a)" 
+                  : "var(--primary-color-light, #e0f2fe)";
                 e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.05)";
+                e.currentTarget.style.boxShadow = theme === "dark" 
+                  ? "0 2px 4px rgba(0,0,0,0.2)" 
+                  : "0 2px 4px rgba(0,0,0,0.05)";
               }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -502,16 +537,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </svg>
               Inicio Wiki
             </Link>
+          </div>
+          
+          <div style={{ flex: 1, overflow: 'hidden' }}>
             {loading ? (
-              <div style={{ padding: 12, color: "#888" }}>Loading topic tree...</div>
+              <div style={{ padding: 12, color: "#888" }}>Cargando temas...</div>
             ) : error ? (
               <div style={{ padding: 12, color: "#c00" }}>Error: {error}</div>
             ) : tree && tree.length > 0 ? (
-              <TreeList nodes={tree} selectedSlug={slug} />
+              <PageHierarchyNavigation selectedSlug={slug} />
             ) : (
-              <div style={{ padding: 12, color: "#888" }}>No topics available.</div>
+              <div style={{ padding: 12, color: "#888" }}>No hay temas disponibles.</div>
             )}
-          </nav>
+          </div>
         </div>
       </aside>
       <main className="wiki-main" style={{ 
@@ -606,45 +644,4 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   );
 }
 
-function TreeList({ nodes, selectedSlug }: { nodes: TopicNode[]; selectedSlug: string | null }) {
-  const [open, setOpen] = useState<{ [id: string]: boolean }>({});
-  if (!nodes || !nodes.length) return null;
-  return (
-    <ul style={{ listStyle: "none", paddingLeft: 12 }}>
-      {nodes.map(node => (
-        <li key={node.id}>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            {node.children && node.children.length > 0 && (
-              <button
-                style={{
-                  marginRight: 4,
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 12,
-                }}
-                onClick={() => setOpen(o => ({ ...o, [node.id]: !o[node.id] }))}
-              >
-                {open[node.id] ? "▼" : "▶"}
-              </button>
-            )}
-            <Link
-              href={`/pages-arbol/${node.slug}`}
-              style={{
-                cursor: "pointer",
-                color: selectedSlug === node.slug ? "#1d4ed8" : "#2563eb",
-                fontWeight: selectedSlug === node.slug ? 700 : 400,
-                textDecoration: "none"
-              }}
-            >
-              {node.label}
-            </Link>
-          </div>
-          {node.children && node.children.length > 0 && open[node.id] && (
-            <TreeList nodes={node.children} selectedSlug={selectedSlug} />
-          )}
-        </li>
-      ))}
-    </ul>
-  );
-}
+// El componente TreeList ha sido reemplazado por HierarchicalNavigation

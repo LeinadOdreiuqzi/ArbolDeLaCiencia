@@ -6,6 +6,10 @@ export type TopicNode = {
   url: string;
   children?: TopicNode[];
   content?: any;
+  metadata?: {
+    level: number;
+    type: string;
+  };
 };
 
 function robustParseContent(input: any): any {

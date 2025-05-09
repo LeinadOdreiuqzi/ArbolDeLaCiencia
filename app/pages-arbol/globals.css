@@ -180,6 +180,32 @@ body {
   margin-bottom: 1rem;
 }
 
+/* Estilos para el botón de inicio wiki */
+.home-wiki-button {
+  width: fit-content;
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .home-wiki-button {
+    font-size: 0.85rem !important;
+    padding: 8px 12px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-wiki-button {
+    font-size: 0.8rem !important;
+    padding: 6px 10px !important;
+    width: 100% !important;
+  }
+  
+  .home-wiki-button svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
 /* Barra de progreso de lectura */
 .reading-progress-container {
   position: fixed;

@@ -1,5 +1,5 @@
 # Tree of Science
-
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/LeinadOdreiuqzi/ArbolDeLaCiencia)
 A web application for visualizing and exploring the structure and relationships of scientific knowledge as an interactive tree graph.
 
 ## Table of Contents
