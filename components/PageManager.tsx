@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import RichTextRenderer from "./RichTextRenderer";
 import dynamic from 'next/dynamic';
 
-const RichTextEditor = dynamic(() => import('./RichTextEditor'), {
+const SimpleEditor = dynamic(() => import('./SimpleEditor'), {
   ssr: false,
   loading: () => <p>Cargando editor...</p> // Optional loading indicator
 });
@@ -322,9 +322,10 @@ export default function PageManager() {
               <div style={{ marginBottom: '10px', padding: '8px', backgroundColor: '#f0f7ff', borderRadius: '4px', fontSize: '0.9em' }}>
                 <strong>Nota:</strong> El contenido extenso se paginará automáticamente en la visualización. No es necesario dividir manualmente el contenido en páginas.
               </div>
-              <RichTextEditor
+              <SimpleEditor
                 key={selectedPage.id} // Ensure editor re-mounts cleanly on page change
                 content={draftContent}
+                initialContent={selectedPage.content} // Pasar el contenido inicial desde la BD
                 onChange={handleDraftChange}
               />
             </div>

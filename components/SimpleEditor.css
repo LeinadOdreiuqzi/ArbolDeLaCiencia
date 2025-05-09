@@ -1,0 +1,157 @@
+.simple-editor {
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.menu-bar {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e1e1e1;
+  background-color: #f8f8f8;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.menu-section {
+  display: flex;
+  gap: 5px;
+  border-right: 1px solid #e1e1e1;
+  padding-right: 10px;
+  margin-right: 5px;
+}
+
+.menu-section:last-child {
+  border-right: none;
+}
+
+.menu-bar button {
+  background-color: transparent;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.menu-bar button:hover {
+  background-color: #e9e9e9;
+}
+
+.menu-bar button.is-active {
+  background-color: #e3f2fd;
+  border-color: #1976d2;
+  color: #1976d2;
+}
+
+.menu-bar .icon {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.ProseMirror {
+  padding: 15px;
+  min-height: 300px;
+  outline: none;
+  line-height: 1.5;
+}
+
+.ProseMirror p {
+  margin: 1em 0;
+}
+
+.ProseMirror h1 {
+  font-size: 2em;
+  margin: 1em 0 0.5em;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5em;
+  margin: 1em 0 0.5em;
+}
+
+.ProseMirror h3 {
+  font-size: 1.3em;
+  margin: 1em 0 0.5em;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 2em;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid #ddd;
+  margin-left: 0;
+  padding-left: 1em;
+  color: #666;
+}
+
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+  border-radius: 4px;
+}
+
+/* Estilos para videos embebidos */
+.video-wrapper {
+  position: relative;
+  padding-bottom: 56.25%; /* Relación de aspecto 16:9 */
+  height: 0;
+  overflow: hidden;
+  margin: 1em 0;
+}
+
+.video-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.video-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 4px;
+}
+
+.ProseMirror pre {
+  background-color: #f5f5f5;
+  border-radius: 5px;
+  padding: 10px;
+  font-family: 'Courier New', Courier, monospace;
+  overflow-x: auto;
+}
+
+.ProseMirror code {
+  background-color: #f5f5f5;
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.ProseMirror a {
+  color: #1976d2;
+  text-decoration: underline;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
+}
