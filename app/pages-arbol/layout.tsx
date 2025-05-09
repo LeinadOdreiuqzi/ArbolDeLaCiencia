@@ -462,6 +462,46 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ThemeToggle />
           <nav aria-label="Wiki Topics">
             <h2 style={{ fontSize: "1.1em", marginBottom: 12, fontWeight: 600 }}>Topics y Subtopics</h2>
+            {/* Botón para ir a la página principal */}
+            <Link 
+              href="/pages-arbol"
+              style={{
+                //display: "block",
+                padding: "10px 14px",
+                margin: "0 0 16px 0",
+                background: "var(--primary-color-light, #e0f2fe)",
+                color: "var(--primary-color, #2563eb)",
+                borderRadius: "8px",
+                textDecoration: "none",
+                textAlign: "center",
+                fontWeight: 600,
+                fontSize: "0.95rem",
+                letterSpacing: "0.3px",
+                transition: "all 0.3s ease",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                border: "1px solid var(--primary-color-lighter, #bfdbfe)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "6px"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--primary-color-lighter, #bfdbfe)";
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 4px 8px rgba(0,0,0,0.08)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "var(--primary-color-light, #e0f2fe)";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.05)";
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+              </svg>
+              Inicio Wiki
+            </Link>
             {loading ? (
               <div style={{ padding: 12, color: "#888" }}>Loading topic tree...</div>
             ) : error ? (
