@@ -1,7 +1,11 @@
 "use client";
 import React, { useEffect, useState } from "react";
 
-const ThemeToggle: React.FC = () => {
+interface ThemeToggleProps {
+  style?: React.CSSProperties;
+}
+
+const ThemeToggle: React.FC<ThemeToggleProps> = ({ style }) => {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [mounted, setMounted] = useState(false);
 
@@ -26,7 +30,7 @@ const ThemeToggle: React.FC = () => {
       style={{
         position: "relative",
         display: "block",
-        margin: "16px auto 24px auto",
+        margin: "0",
         left: "unset",
         top: "unset",
         zIndex: 1,
@@ -34,11 +38,12 @@ const ThemeToggle: React.FC = () => {
         color: theme === "dark" ? "#eee" : "#222",
         border: "1px solid #ccc",
         borderRadius: 6,
-        padding: "6px 14px",
-        fontSize: 18,
+        padding: "6px 10px",
+        fontSize: 16,
         cursor: "pointer",
-        boxShadow: "0 1px 4px 0 #0001",
-        transition: "background 0.2s, color 0.2s"
+        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+        transition: "background 0.2s, color 0.2s, transform 0.2s",
+        ...style
       }}
     >
       {theme === "dark" ? "🌙" : "☀️"}

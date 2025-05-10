@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { TopicNode } from '@/lib/notes-graph-util';
 
@@ -8,6 +8,16 @@ interface HierarchicalNavigationProps {
   nodes: TopicNode[];
   selectedSlug: string | null;
   theme: 'dark' | 'light';
+}
+
+// Extend the TopicNode type to include ancestors for search results
+interface TopicNodeWithPath extends TopicNode {
+  ancestors?: {
+    id: string;
+    label: string;
+    slug: string;
+    url: string;
+  }[];
 }
 
 // Función para obtener el nivel de profundidad de un nodo
@@ -42,20 +52,403 @@ const getNodeType = (node: TopicNode): string => {
   }
 };
 
+// Componente de nodo optimizado con React.memo para evitar re-renderizados innecesarios
+const TreeNode = React.memo(({ 
+  node, 
+  depth, 
+  isLastChild, 
+  parentId, 
+  isExpanded, 
+  isSelected, 
+  isFavorite,
+  theme,
+  onToggleExpand, 
+  onToggleFavorite 
+}: {
+  node: TopicNode;
+  depth: number;
+  isLastChild: boolean;
+  parentId: string | null;
+  isExpanded: boolean;
+  isSelected: boolean;
+  isFavorite: boolean;
+  theme: 'dark' | 'light';
+  onToggleExpand: (nodeId: string) => void;
+  onToggleFavorite: (nodeId: string) => void;
+}) => {
+  const hasChildren = node.children && node.children.length > 0;
+  const nodeLevel = getNodeLevel(node);
+  const nodeType = getNodeType(node);
+  
+  // Calcular colores para el tema
+  const textColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.8)';
+  const mutedTextColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.5)';
+  const highlightColor = theme === 'dark' ? '#60a5fa' : '#2563eb';
+  const borderColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)';
+  const expandButtonColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.5)';
+  
+  // Calcular el estilo de indentación basado en la profundidad
+  // Usamos un enfoque que limita la indentación máxima y usa colores para diferenciar niveles
+  const maxIndent = 32; // Indentación máxima en píxeles
+  const baseIndent = 8; // Indentación base por nivel
+  const actualIndent = depth > 0 ? Math.min(depth * baseIndent, maxIndent) : 0;
+  
+  // Determinar el color de borde izquierdo basado en el nivel para ayudar a distinguir visualmente
+  const getBorderColor = () => {
+    if (depth === 0) return 'transparent';
+    
+    // Colores más sutiles para diferentes niveles de profundidad
+    const levelColors = theme === 'dark' 
+      ? ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'] 
+      : ['#2563eb', '#7c3aed', '#db2777', '#d97706', '#059669'];
+    
+    // Usar un color basado en el módulo para ciclar a través de los colores
+    const baseColor = levelColors[(depth - 1) % levelColors.length];
+    
+    // Hacer el color más sutil con transparencia
+    return theme === 'dark'
+      ? `${baseColor}80` // 50% de opacidad
+      : `${baseColor}40`; // 25% de opacidad
+  };
+  
+  // Determinar el estilo de fondo basado en el nivel
+  const getBackgroundStyle = () => {
+    if (depth === 0) return 'transparent';
+    
+    // Gradiente sutil basado en la profundidad para ayudar a distinguir niveles
+    const opacity = theme === 'dark' 
+      ? Math.min(0.03 + (depth * 0.008), 0.1)  // Más sutil para tema oscuro
+      : Math.min(0.01 + (depth * 0.004), 0.05); // Más sutil para tema claro
+      
+    return theme === 'dark'
+      ? `rgba(255, 255, 255, ${opacity})`
+      : `rgba(0, 0, 0, ${opacity})`;
+  };
+  
+  return (
+    <li 
+      className={`nav-node ${isSelected ? 'selected' : ''} ${isExpanded ? 'expanded' : ''} depth-${depth}`}
+      style={{
+        position: 'relative',
+        paddingBottom: isLastChild && depth > 0 ? '2px' : '1px',
+        marginBottom: '1px',
+      }}
+    >
+      <div 
+        className="node-content"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '5px 6px',
+          paddingLeft: `${actualIndent + 8}px`,
+          borderRadius: '4px',
+          backgroundColor: isSelected 
+            ? theme === 'dark' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.08)' 
+            : getBackgroundStyle(),
+          transition: 'all 0.2s ease',
+          position: 'relative',
+          borderLeft: depth > 0 ? `2px solid ${getBorderColor()}` : 'none',
+          marginLeft: '4px',
+        }}
+      >
+        {/* Botón de expansión para nodos con hijos */}
+        {hasChildren && (
+          <button
+            className="expand-button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleExpand(node.id);
+            }}
+            aria-label={isExpanded ? 'Contraer' : 'Expandir'}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '16px',
+              height: '16px',
+              marginRight: '6px',
+              borderRadius: '2px',
+              padding: 0,
+              transition: 'all 0.2s ease',
+              color: expandButtonColor,
+              fontSize: '9px',
+            }}
+          >
+            <span 
+              style={{
+                transition: 'transform 0.2s ease',
+                transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)',
+                display: 'inline-block',
+              }}
+            >
+              ▶
+            </span>
+          </button>
+        )}
+        
+        {!hasChildren && (
+          <div style={{ width: '22px' }} />
+        )}
+        
+        {/* Enlace al nodo */}
+        <Link
+          href={node.url}
+          className="node-link"
+          style={{
+            textDecoration: 'none',
+            color: isSelected 
+              ? highlightColor
+              : textColor,
+            fontWeight: isSelected ? 500 : depth === 0 ? 500 : 400,
+            fontSize: depth === 0 ? '0.92rem' : '0.88rem',
+            flex: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            transition: 'all 0.2s ease',
+            padding: '2px 0',
+            letterSpacing: '0.01em',
+          }}
+        >
+          {node.label}
+        </Link>
+        
+        {/* Contador de hijos - más sutil */}
+        {hasChildren && (
+          <span 
+            className="children-count"
+            style={{
+              fontSize: '0.7rem',
+              padding: '0 4px',
+              color: mutedTextColor,
+              marginLeft: '4px',
+              fontWeight: 400,
+              opacity: 0.8,
+            }}
+          >
+            {node.children?.length || 0}
+          </span>
+        )}
+        
+        {/* Botón de favorito - más sutil */}
+        <button
+          className={`favorite-button ${isFavorite ? 'active' : ''}`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleFavorite(node.id);
+          }}
+          aria-label={isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '20px',
+            height: '20px',
+            marginLeft: '2px',
+            opacity: isFavorite ? 1 : 0.2,
+            color: isFavorite ? (theme === 'dark' ? '#fbbf24' : '#f59e0b') : (theme === 'dark' ? 'rgba(255, 255, 255, 0.8)' : 'inherit'),
+            transition: 'all 0.2s ease',
+            fontSize: '0.85rem',
+          }}
+        >
+          {isFavorite ? '★' : '☆'}
+        </button>
+      </div>
+      
+      {/* Renderizar hijos si el nodo está expandido */}
+      {hasChildren && isExpanded && (
+        <ul 
+          className="node-children"
+          style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: 0,
+            marginTop: '1px',
+          }}
+        >
+          {node.children?.map((child, index) => (
+            <TreeNodeContainer
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              isLastChild={index === (node.children?.length || 0) - 1}
+              parentId={node.id}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+});
+
+TreeNode.displayName = 'TreeNode';
+
+// Container component that connects TreeNode to the parent state
+const TreeNodeContainer = React.memo(({ 
+  node, 
+  depth, 
+  isLastChild, 
+  parentId 
+}: {
+  node: TopicNode;
+  depth: number;
+  isLastChild: boolean;
+  parentId: string | null;
+}) => {
+  // Use the navigation context
+  const { 
+    expandedNodes, 
+    toggleNodeExpansion, 
+    favorites, 
+    toggleFavorite, 
+    selectedSlug, 
+    theme,
+    isSearching
+  } = useNavigationContext();
+  
+  const isExpanded = expandedNodes[node.id];
+  const isFavorite = favorites.includes(node.id);
+  const isSelected = node.slug === selectedSlug;
+  const hasChildren = node.children && node.children.length > 0;
+  
+  // Determine if this node should be displayed based on depth and expansion state
+  const shouldDisplay = depth === 0 || (depth > 0 && parentId && expandedNodes[parentId]);
+  
+  // Para búsquedas, mostramos la ruta completa al nodo
+  const isInSearchResults = isSearching;
+  
+  // Si estamos en modo búsqueda y este nodo está en los resultados, siempre mostrarlo
+  if (!shouldDisplay && !isInSearchResults) return null;
+  
+  // Calcular un nivel visual efectivo para limitar la indentación en niveles muy profundos
+  // Esto ayuda a mantener la legibilidad incluso en niveles muy anidados
+  const effectiveDepth = Math.min(depth, 5);
+  
+  // Comprobar si es el área de Química para el manejo especial
+  const isChemistry = node.label.toLowerCase().includes('química') || 
+                      node.label.toLowerCase().includes('quimica') || 
+                      node.slug?.toLowerCase().includes('quimica') || 
+                      node.slug?.toLowerCase().includes('química');
+  
+  return (
+    <TreeNode
+      node={node}
+      depth={effectiveDepth}
+      isLastChild={isLastChild}
+      parentId={parentId}
+      isExpanded={isExpanded}
+      isSelected={isSelected}
+      isFavorite={isFavorite}
+      theme={theme}
+      onToggleExpand={toggleNodeExpansion}
+      onToggleFavorite={toggleFavorite}
+    />
+  );
+});
+
+TreeNodeContainer.displayName = 'TreeNodeContainer';
+
+// Create a context to avoid prop drilling
+interface NavigationContextType {
+  expandedNodes: Record<string, boolean>;
+  toggleNodeExpansion: (nodeId: string) => void;
+  favorites: string[];
+  toggleFavorite: (nodeId: string) => void;
+  clearAllFavorites: () => void;
+  selectedSlug: string | null;
+  theme: 'dark' | 'light';
+  isSearching: boolean;
+}
+
+const NavigationContext = React.createContext<NavigationContextType | null>(null);
+
+const useNavigationContext = () => {
+  const context = React.useContext(NavigationContext);
+  if (context === null) {
+    throw new Error('useNavigationContext must be used within a NavigationProvider');
+  }
+  return context;
+};
+
 const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, selectedSlug, theme }) => {
   // Estado para nodos expandidos
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   
   // Estado para la búsqueda
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<TopicNode[]>([]);
+  const [searchResults, setSearchResults] = useState<TopicNodeWithPath[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   
   // Estado para favoritos
   const [favorites, setFavorites] = useState<string[]>([]);
   
+  // Estado para el renderizado virtualizado
+  const [visibleStartIndex, setVisibleStartIndex] = useState(0);
+  const [itemsToRender, setItemsToRender] = useState(50); // Número inicial de elementos a renderizar
+  
   // Referencia al contenedor para scroll
   const navContainerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  
+  // Verificar si un nodo es el área de Química para evitar expandirlo automáticamente
+  const isChemistryArea = useCallback((node: TopicNode): boolean => {
+    return node.label.toLowerCase().includes('química') || 
+           node.label.toLowerCase().includes('quimica') || 
+           node.slug?.toLowerCase().includes('quimica') || 
+           node.slug?.toLowerCase().includes('química');
+  }, []);
+  
+  // Función para alternar la expansión de un nodo
+  const toggleNodeExpansion = useCallback((nodeId: string) => {
+    setExpandedNodes(prev => ({
+      ...prev,
+      [nodeId]: !prev[nodeId]
+    }));
+  }, []);
+  
+  // Función para alternar un nodo como favorito
+  const toggleFavorite = useCallback((nodeId: string) => {
+    setFavorites(prev => {
+      const newFavorites = prev.includes(nodeId) 
+        ? prev.filter(id => id !== nodeId)
+        : [...prev, nodeId];
+      
+      // Guardar inmediatamente en localStorage para evitar pérdida de datos
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('wiki-favorites', JSON.stringify(newFavorites));
+      }
+      
+      return newFavorites;
+    });
+  }, []);
+
+  // Limpiar todos los favoritos
+  const clearAllFavorites = useCallback(() => {
+    setFavorites([]);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('wiki-favorites');
+    }
+  }, []);
+  
+  // Memoize the context value to prevent unnecessary re-renders
+  const navigationContextValue = useMemo(() => ({
+    expandedNodes,
+    toggleNodeExpansion,
+    favorites,
+    toggleFavorite,
+    clearAllFavorites,
+    selectedSlug,
+    theme,
+    isSearching
+  }), [expandedNodes, favorites, selectedSlug, theme, isSearching, toggleNodeExpansion, toggleFavorite, clearAllFavorites]);
   
   // Expandir automáticamente los nodos padres del nodo seleccionado
   useEffect(() => {
@@ -79,13 +472,43 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
     const nodePath = expandPathToNode(nodes);
     
     if (nodePath) {
-      const newExpandedNodes = { ...expandedNodes };
+      // Solo expandir los nodos en la ruta al nodo seleccionado, no todos los nodos
+      const newExpandedNodes: Record<string, boolean> = {};
+      
+      // Filtrar nodos para evitar expandir automáticamente el área de Química
       nodePath.forEach(id => {
-        newExpandedNodes[id] = true;
+        // Encontrar el nodo actual para verificar si es el área de Química
+        const findNode = (nodeList: TopicNode[], nodeId: string): TopicNode | null => {
+          for (const node of nodeList) {
+            if (node.id === nodeId) return node;
+            if (node.children && node.children.length > 0) {
+              const found = findNode(node.children, nodeId);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+        
+        const currentNode = findNode(nodes, id);
+        
+        // Solo expandir si no es el área de Química o si es el nodo seleccionado
+        if (currentNode && (!isChemistryArea(currentNode) || currentNode.slug === selectedSlug)) {
+          newExpandedNodes[id] = true;
+        }
       });
+      
+      // Actualizar el estado con solo los nodos que deben estar expandidos
       setExpandedNodes(newExpandedNodes);
+      
+      // Scroll to selected node after a short delay to ensure DOM is updated
+      setTimeout(() => {
+        const selectedElement = document.querySelector('.nav-node.selected');
+        if (selectedElement && contentRef.current) {
+          selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
     }
-  }, [nodes, selectedSlug]);
+  }, [nodes, selectedSlug, isChemistryArea]);
   
   // Cargar favoritos desde localStorage
   useEffect(() => {
@@ -93,40 +516,47 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
       const storedFavorites = localStorage.getItem('wiki-favorites');
       if (storedFavorites) {
         try {
-          setFavorites(JSON.parse(storedFavorites));
+          const parsedFavorites = JSON.parse(storedFavorites);
+          if (Array.isArray(parsedFavorites)) {
+            setFavorites(parsedFavorites);
+          }
         } catch (e) {
           console.error('Error parsing favorites:', e);
+          // Si hay un error, limpiar localStorage
+          localStorage.removeItem('wiki-favorites');
         }
       }
     }
   }, []);
   
-  // Guardar favoritos en localStorage cuando cambien
+  // Handle scroll events for virtual scrolling
   useEffect(() => {
-    if (typeof window !== 'undefined' && favorites.length > 0) {
-      localStorage.setItem('wiki-favorites', JSON.stringify(favorites));
+    const handleScroll = () => {
+      if (!contentRef.current) return;
+      
+      const { scrollTop, clientHeight, scrollHeight } = contentRef.current;
+      const scrollPercentage = scrollTop / (scrollHeight - clientHeight);
+      
+      // Load more items when user scrolls past 80% of the current view
+      if (scrollPercentage > 0.8 && nodes.length > itemsToRender) {
+        setItemsToRender(prev => Math.min(prev + 30, nodes.length));
+      }
+      
+      // Adjust visible range based on scroll position
+      const estimatedItemHeight = 36; // Average height of an item in pixels
+      const startIndex = Math.max(0, Math.floor(scrollTop / estimatedItemHeight) - 10);
+      setVisibleStartIndex(startIndex);
+    };
+    
+    const contentElement = contentRef.current;
+    if (contentElement) {
+      contentElement.addEventListener('scroll', handleScroll);
+      return () => contentElement.removeEventListener('scroll', handleScroll);
     }
-  }, [favorites]);
-  
-  // Función para alternar la expansión de un nodo
-  const toggleNodeExpansion = (nodeId: string) => {
-    setExpandedNodes(prev => ({
-      ...prev,
-      [nodeId]: !prev[nodeId]
-    }));
-  };
-  
-  // Función para alternar un nodo como favorito
-  const toggleFavorite = (nodeId: string) => {
-    setFavorites(prev => 
-      prev.includes(nodeId) 
-        ? prev.filter(id => id !== nodeId)
-        : [...prev, nodeId]
-    );
-  };
+  }, [nodes.length, itemsToRender]);
   
   // Función para buscar nodos
-  const handleSearch = (term: string) => {
+  const handleSearch = useCallback((term: string) => {
     setSearchTerm(term);
     
     if (!term.trim()) {
@@ -137,235 +567,89 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
     
     setIsSearching(true);
     
-    // Función recursiva para buscar en el árbol
-    const searchInTree = (nodeList: TopicNode[]): TopicNode[] => {
-      let results: TopicNode[] = [];
-      
-      for (const node of nodeList) {
-        // Buscar en el título del nodo
-        if (node.label.toLowerCase().includes(term.toLowerCase())) {
-          results.push(node);
+    // Debounce search for better performance
+    const debounceTimer = setTimeout(() => {
+      // Función recursiva para buscar en el árbol
+      const searchInTree = (nodeList: TopicNode[], ancestors: TopicNodeWithPath['ancestors'] = []): TopicNodeWithPath[] => {
+        let results: TopicNodeWithPath[] = [];
+        
+        for (const node of nodeList) {
+          // Crear una copia del nodo con información de ancestros para mostrar breadcrumbs
+          const nodeWithPath: TopicNodeWithPath = {
+            ...node,
+            ancestors: [...(ancestors || [])]
+          };
+          
+          // Buscar en el título del nodo
+          if (node.label.toLowerCase().includes(term.toLowerCase())) {
+            results.push(nodeWithPath);
+          }
+          
+          // Buscar en los hijos
+          if (node.children && node.children.length > 0) {
+            results = [
+              ...results, 
+              ...searchInTree(
+                node.children, 
+                [...(ancestors || []), { id: node.id, label: node.label, slug: node.slug, url: node.url }]
+              )
+            ];
+          }
         }
         
-        // Buscar en los hijos
-        if (node.children && node.children.length > 0) {
-          results = [...results, ...searchInTree(node.children)];
-        }
-      }
+        return results;
+      };
       
-      return results;
-    };
+      // Limitar a 50 resultados para evitar sobrecarga
+      const results = searchInTree(nodes).slice(0, 50);
+      setSearchResults(results as TopicNodeWithPath[]);
+    }, 300);
     
-    // Limitar a 50 resultados para evitar sobrecarga
-    const results = searchInTree(nodes).slice(0, 50);
-    setSearchResults(results);
-  };
+    return () => clearTimeout(debounceTimer);
+  }, [nodes]);
   
-  // Renderizar un nodo individual
-  const renderNode = (node: TopicNode, depth: number = 0, isLastChild: boolean = false, parentId: string | null = null) => {
-    const hasChildren = node.children && node.children.length > 0;
-    const isExpanded = expandedNodes[node.id];
-    const isFavorite = favorites.includes(node.id);
-    const isSelected = node.slug === selectedSlug;
-    const nodeLevel = getNodeLevel(node);
-    const nodeType = getNodeType(node);
-    
-    // Determinar si este nodo debe mostrarse basado en la profundidad y el estado de expansión
-    // Para nodos de nivel superior (Áreas), siempre mostrarlos
-    // Para nodos más profundos, mostrarlos solo si su padre está expandido
-    const shouldDisplay = depth === 0 || (depth > 0 && parentId && expandedNodes[parentId]);
-    
-    if (!shouldDisplay && !isSearching) return null;
-    
+  // Renderizar un nodo individual - Esta función será reemplazada por el componente TreeNode
+  const renderNode = useCallback((node: TopicNode, depth: number = 0, isLastChild: boolean = false, parentId: string | null = null) => {
     return (
-      <li 
+      <TreeNodeContainer
         key={node.id}
-        className={`nav-node ${isSelected ? 'selected' : ''} ${isExpanded ? 'expanded' : ''} depth-${depth}`}
-        style={{
-          marginLeft: depth > 0 ? `${depth * 12}px` : '0',
-          position: 'relative',
-          paddingBottom: isLastChild && depth > 0 ? '8px' : '4px',
-          borderLeft: depth > 0 ? `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}` : 'none',
-          paddingLeft: depth > 0 ? '12px' : '0',
-        }}
-      >
-        <div 
-          className="node-content"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '6px 8px',
-            borderRadius: '6px',
-            backgroundColor: isSelected 
-              ? theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)' 
-              : 'transparent',
-            transition: 'all 0.2s ease',
-            position: 'relative',
-          }}
-        >
-          {/* Indicador de tipo de nodo */}
-          <span 
-            className="node-type-indicator"
-            style={{
-              fontSize: '10px',
-              padding: '2px 4px',
-              borderRadius: '4px',
-              marginRight: '6px',
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-              color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
-              display: 'inline-block',
-              minWidth: '16px',
-              textAlign: 'center',
-            }}
-          >
-            {nodeType.charAt(0)}
-          </span>
-          
-          {/* Botón de expansión para nodos con hijos */}
-          {hasChildren && (
-            <button
-              className="expand-button"
-              onClick={() => toggleNodeExpansion(node.id)}
-              aria-label={isExpanded ? 'Contraer' : 'Expandir'}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '20px',
-                height: '20px',
-                marginRight: '4px',
-                borderRadius: '4px',
-                transition: 'all 0.2s ease',
-                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-              }}
-            >
-              <span 
-                style={{
-                  transition: 'transform 0.2s ease',
-                  transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)',
-                  display: 'inline-block',
-                  fontSize: '10px',
-                }}
-              >
-                ▶
-              </span>
-            </button>
-          )}
-          
-          {/* Enlace al nodo */}
-          <Link
-            href={node.url}
-            className="node-link"
-            style={{
-              textDecoration: 'none',
-              color: isSelected 
-                ? theme === 'dark' ? '#60a5fa' : '#2563eb'
-                : theme === 'dark' ? '#e5e7eb' : '#374151',
-              fontWeight: isSelected ? 600 : 400,
-              fontSize: depth === 0 ? '0.95rem' : '0.9rem',
-              flex: 1,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s ease',
-              padding: '2px 0',
-            }}
-          >
-            {node.label}
-          </Link>
-          
-          {/* Contador de hijos */}
-          {hasChildren && (
-            <span 
-              className="children-count"
-              style={{
-                fontSize: '10px',
-                padding: '1px 4px',
-                borderRadius: '10px',
-                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                color: theme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)',
-                marginLeft: '4px',
-              }}
-            >
-              {node.children?.length || 0}
-            </span>
-          )}
-          
-          {/* Botón de favorito */}
-          <button
-            className={`favorite-button ${isFavorite ? 'active' : ''}`}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              toggleFavorite(node.id);
-            }}
-            aria-label={isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '24px',
-              height: '24px',
-              marginLeft: '4px',
-              opacity: isFavorite ? 1 : 0.3,
-              color: isFavorite ? (theme === 'dark' ? '#fbbf24' : '#f59e0b') : 'inherit',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            {isFavorite ? '★' : '☆'}
-          </button>
-        </div>
-        
-        {/* Renderizar hijos si el nodo está expandido */}
-        {hasChildren && isExpanded && (
-          <ul 
-            className="node-children"
-            style={{
-              listStyle: 'none',
-              padding: 0,
-              margin: 0,
-              marginTop: '4px',
-            }}
-          >
-            {node.children?.map((child, index) => 
-              renderNode(child, depth + 1, index === (node.children?.length || 0) - 1, node.id)
-            )}
-          </ul>
-        )}
-      </li>
+        node={node}
+        depth={depth}
+        isLastChild={isLastChild}
+        parentId={parentId}
+      />
     );
-  };
+  }, []);
   
-  // Renderizar la lista de nodos favoritos
-  const renderFavorites = () => {
-    if (favorites.length === 0) return null;
+  // Renderizar la sección de favoritos
+  const renderFavorites = useCallback(() => {
+    // Encontrar los nodos favoritos
+    const favoriteNodes: TopicNode[] = [];
     
-    // Función para encontrar un nodo por su ID
     const findNodeById = (nodeList: TopicNode[], id: string): TopicNode | null => {
       for (const node of nodeList) {
         if (node.id === id) return node;
-        
         if (node.children && node.children.length > 0) {
           const found = findNodeById(node.children, id);
           if (found) return found;
         }
       }
-      
       return null;
     };
     
-    // Obtener los nodos favoritos
-    const favoriteNodes = favorites
-      .map(id => findNodeById(nodes, id))
-      .filter((node): node is TopicNode => node !== null);
+    // Buscar todos los nodos favoritos
+    favorites.forEach(id => {
+      const node = findNodeById(nodes, id);
+      if (node) favoriteNodes.push(node);
+    });
     
-    if (favoriteNodes.length === 0) return null;
+    // Si no hay favoritos, no mostrar la sección
+    if (favoriteNodes.length === 0) {
+      return null;
+    }
+    
+    // Colores para tema oscuro
+    const headerColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.7)';
     
     return (
       <div className="favorites-section">
@@ -375,10 +659,42 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
             fontWeight: 600,
             margin: '16px 0 8px 0',
             padding: '0 8px',
-            color: theme === 'dark' ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)',
+            color: headerColor,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`,
+            paddingBottom: '6px'
           }}
         >
-          Favoritos
+          <span>Favoritos</span>
+          {favoriteNodes.length > 0 && (
+            <button
+              onClick={clearAllFavorites}
+              style={{
+                background: 'none',
+                border: `1px solid ${theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)'}`,
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+                color: theme === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span style={{ fontSize: '0.7rem' }}>✕</span>
+              Limpiar
+            </button>
+          )}
         </h3>
         <ul 
           style={{
@@ -388,47 +704,27 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
           }}
         >
           {favoriteNodes.map(node => (
-            <li 
+            <TreeNodeContainer
               key={`fav-${node.id}`}
-              style={{
-                margin: '4px 0',
-              }}
-            >
-              <Link
-                href={node.url}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  textDecoration: 'none',
-                  color: theme === 'dark' ? '#e5e7eb' : '#374151',
-                  backgroundColor: node.slug === selectedSlug 
-                    ? theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)' 
-                    : 'transparent',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                <span 
-                  style={{
-                    color: theme === 'dark' ? '#fbbf24' : '#f59e0b',
-                    marginRight: '6px',
-                  }}
-                >
-                  ★
-                </span>
-                {node.label}
-              </Link>
-            </li>
+              node={node}
+              depth={0}
+              isLastChild={false}
+              parentId={null}
+            />
           ))}
         </ul>
       </div>
     );
-  };
+  }, [favorites, nodes, theme, clearAllFavorites]);
   
   // Renderizar los resultados de búsqueda
-  const renderSearchResults = () => {
+  const renderSearchResults = useCallback(() => {
     if (!isSearching || searchResults.length === 0) return null;
+    
+    // Colores para tema oscuro
+    const headerColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.7)';
+    const breadcrumbColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.5)';
+    const dividerColor = theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)';
     
     return (
       <div className="search-results">
@@ -438,7 +734,7 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
             fontWeight: 600,
             margin: '16px 0 8px 0',
             padding: '0 8px',
-            color: theme === 'dark' ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)',
+            color: headerColor,
           }}
         >
           Resultados ({searchResults.length})
@@ -450,50 +746,129 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
             margin: 0,
           }}
         >
-          {searchResults.map(node => (
-            <li 
-              key={`search-${node.id}`}
-              style={{
-                margin: '4px 0',
-              }}
-            >
-              <Link
-                href={node.url}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  textDecoration: 'none',
-                  color: theme === 'dark' ? '#e5e7eb' : '#374151',
-                  backgroundColor: node.slug === selectedSlug 
-                    ? theme === 'dark' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)' 
-                    : 'transparent',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                <span 
+          {searchResults.map((node) => (
+            <li key={`search-${node.id}`}>
+              {/* Mostrar breadcrumbs para resultados de búsqueda */}
+              {node.ancestors && node.ancestors.length > 0 && (
+                <div 
+                  className="search-breadcrumbs"
                   style={{
-                    fontSize: '10px',
-                    padding: '2px 4px',
-                    borderRadius: '4px',
-                    marginRight: '6px',
-                    backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                    color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+                    fontSize: '0.75rem',
+                    padding: '0 8px 2px 12px',
+                    color: breadcrumbColor,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
                   }}
                 >
-                  {getNodeType(node).charAt(0)}
-                </span>
-                {node.label}
-              </Link>
+                  {node.ancestors.map((ancestor, idx: number) => (
+                    <React.Fragment key={ancestor.id}>
+                      <Link 
+                        href={ancestor.url}
+                        style={{
+                          color: breadcrumbColor,
+                          textDecoration: 'none',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: '100px',
+                          display: 'inline-block',
+                        }}
+                      >
+                        {ancestor.label}
+                      </Link>
+                      <span 
+                        style={{ 
+                          margin: '0 4px',
+                          color: dividerColor,
+                          fontSize: '0.7rem',
+                        }}
+                      >
+                        /
+                      </span>
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+              <TreeNodeContainer
+                node={node}
+                depth={0}
+                isLastChild={false}
+                parentId={null}
+              />
             </li>
           ))}
         </ul>
       </div>
     );
-  };
+  }, [isSearching, searchResults, theme]);
+  
+  // Renderizar el árbol principal con virtualización
+  const renderVirtualizedTree = useCallback(() => {
+    if (nodes.length === 0) {
+      return <div>No hay temas disponibles</div>;
+    }
+    
+    // Determinar el rango de nodos a renderizar
+    const endIndex = Math.min(visibleStartIndex + itemsToRender, nodes.length);
+    const visibleNodes = nodes.slice(visibleStartIndex, endIndex);
+    
+    // Calcular la altura total estimada para mantener el scroll correcto
+    const estimatedItemHeight = 36; // Altura promedio de un ítem en píxeles
+    const topPadding = visibleStartIndex * estimatedItemHeight;
+    const bottomPadding = Math.max(0, (nodes.length - endIndex) * estimatedItemHeight);
+    
+    return (
+      <div className="virtualized-tree-container" style={{ position: 'relative' }}>
+        {/* Espaciador superior para mantener la posición de scroll */}
+        {topPadding > 0 && <div style={{ height: `${topPadding}px` }} />}
+        
+        {/* Nodos visibles */}
+        <ul 
+          style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: 0,
+          }}
+        >
+          {visibleNodes.map((node, index) => (
+            <TreeNodeContainer
+              key={node.id}
+              node={node}
+              depth={0}
+              isLastChild={index === visibleNodes.length - 1 && endIndex === nodes.length}
+              parentId={null}
+            />
+          ))}
+        </ul>
+        
+        {/* Espaciador inferior para mantener la posición de scroll */}
+        {bottomPadding > 0 && <div style={{ height: `${bottomPadding}px` }} />}
+      </div>
+    );
+  }, [nodes, visibleStartIndex, itemsToRender]);
+  
+  // Función para colapsar todos los nodos
+  const collapseAll = useCallback(() => {
+    setExpandedNodes({});
+  }, []);
+  
+  // Función para expandir solo el primer nivel
+  const expandFirstLevel = useCallback(() => {
+    const newExpandedNodes: Record<string, boolean> = {};
+    
+    // Expandir solo los nodos de nivel 1
+    nodes.forEach(node => {
+      if (getNodeLevel(node) === 1) {
+        newExpandedNodes[node.id] = true;
+      }
+    });
+    
+    setExpandedNodes(newExpandedNodes);
+  }, [nodes]);
   
   return (
+    <NavigationContext.Provider value={navigationContextValue}>
     <div 
       className="hierarchical-navigation"
       ref={navContainerRef}
@@ -512,6 +887,8 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
           top: 0,
           zIndex: 10,
           backgroundColor: theme === 'dark' ? 'var(--nav-bg)' : 'var(--nav-bg)',
+          borderBottom: `1px solid ${theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`,
+          marginBottom: '8px'
         }}
       >
         <div 
@@ -530,9 +907,9 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
               width: '100%',
               padding: '8px 12px 8px 32px',
               borderRadius: '6px',
-              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
-              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
-              color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)',
+              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
+              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.02)',
+              color: theme === 'dark' ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.8)',
               fontSize: '0.9rem',
               outline: 'none',
               transition: 'all 0.2s ease',
@@ -542,7 +919,7 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
             style={{
               position: 'absolute',
               left: '10px',
-              color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
+              color: theme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)',
               pointerEvents: 'none',
             }}
           >
@@ -557,7 +934,7 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
+                color: theme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)',
                 padding: '0',
                 display: 'flex',
                 alignItems: 'center',
@@ -569,15 +946,50 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
             </button>
           )}
         </div>
+        
+        {/* Botones de control para expandir/colapsar */}
+        {!isSearching && (
+          <div className="tree-controls" style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            marginTop: '8px',
+            padding: '0 4px'
+          }}>
+            <button
+              onClick={collapseAll}
+              style={{
+                background: 'none',
+                border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)'}`,
+                borderRadius: '4px',
+                padding: '4px 10px',
+                fontSize: '0.75rem',
+                color: theme === 'dark' ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.6)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                width: '100%'
+              }}
+            >
+              <span style={{ fontSize: '0.7rem' }}>⟰</span>
+              Colapsar todo
+            </button>
+          </div>
+        )}
       </div>
       
       {/* Contenido principal */}
       <div 
         className="navigation-content"
+          ref={contentRef}
         style={{
           flex: 1,
           overflowY: 'auto',
           padding: '0 8px',
+          color: theme === 'dark' ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)',
+            scrollBehavior: 'smooth',
         }}
       >
         {/* Mostrar resultados de búsqueda si está buscando */}
@@ -596,26 +1008,21 @@ const HierarchicalNavigation: React.FC<HierarchicalNavigationProps> = ({ nodes, 
                   fontWeight: 600,
                   margin: '16px 0 8px 0',
                   padding: '0 8px',
-                  color: theme === 'dark' ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)',
+                  color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.7)',
                 }}
               >
                 Todos los temas
               </h3>
             )}
-            <ul 
-              style={{
-                listStyle: 'none',
-                padding: 0,
-                margin: 0,
-              }}
-            >
-              {nodes.map((node, index) => renderNode(node, 0, index === nodes.length - 1, null))}
-            </ul>
+              
+              {/* Usar renderizado virtualizado para mejorar el rendimiento con miles de nodos */}
+              {renderVirtualizedTree()}
           </div>
         )}
       </div>
     </div>
+    </NavigationContext.Provider>
   );
 };
 
-export default HierarchicalNavigation;
+export default React.memo(HierarchicalNavigation);

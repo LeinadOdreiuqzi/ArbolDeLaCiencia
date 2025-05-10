@@ -5,7 +5,6 @@ import "./globals.css";
 import LargeKnowledgeGraph from "../../components/LargeKnowledgeGraph";
 import ThemeToggle from "../../components/ThemeToggle";
 import WikiHeadingsLinks from "../../components/WikiHeadingsLinks";
-import ReadingProgressBar from "../../components/ReadingProgressBar";
 import Pagination from "../../components/Pagination";
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -436,9 +435,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         gridTemplateColumns: `${navOpen ? '260px' : '0'} 1fr ${graphOpen ? '340px' : '0'}`,
         gridTemplateAreas: '"nav main graph"',
         minHeight: '100vh',
-        transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+        transition: 'all 0.3s ease',
+        background: 'var(--background)',
+        gap: '0'
       }}>
-      <ReadingProgressBar />
       {/* Botón de toggle para el panel izquierdo, ahora fuera del aside */}
       <button
         className="wiki-nav-toggle-fixed"
@@ -459,8 +459,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           justifyContent: "center",
           fontSize: 20,
           cursor: "pointer",
-          boxShadow: "0 1px 4px 0 #0001",
-          transition: "left 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s, color 0.3s"
+          boxShadow: "0 1px 4px rgba(0, 0, 0, 0.03)",
+          transition: "left 0.3s ease, background-color 0.3s, color 0.3s"
         }}
       >
         {navOpen ? "←" : "→"}
@@ -477,40 +477,43 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           overflow: navOpen ? "auto" : "hidden",
           opacity: navOpen ? 1 : 0,
           visibility: navOpen ? "visible" : "hidden",
-          transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+          transition: "width 0.3s ease, opacity 0.3s ease, visibility 0.3s ease",
           zIndex: 10, 
           background: 'var(--nav-bg)',
-          boxShadow: navOpen ? '2px 0 8px rgba(0,0,0,0.15)' : 'none'
+          borderRight: '1px solid var(--border)',
+          boxShadow: navOpen ? '0 0 10px rgba(0, 0, 0, 0.03)' : 'none',
+          padding: navOpen ? '45px 16px 16px 16px' : '0'
         }}
       >
-        <div style={{ paddingTop: '20px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '0 12px 16px 12px' }}>
-            <ThemeToggle />
-            <h2 style={{ fontSize: "1.1em", marginBottom: 12, fontWeight: 600, padding: '0 8px' }}>Topics y Subtopics</h2>
-            {/* Botón para ir a la página principal */}
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ 
+            marginBottom: '0.75rem', 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            gap: '8px'
+          }}>
             <Link 
               href="/pages-arbol"
               className="home-wiki-button"
               style={{
-                padding: "10px 14px",
-                margin: "0 0 16px 8px",
+                padding: "8px 16px",
                 background: theme === "dark" ? "var(--primary-color-dark, #1e3a8a)" : "var(--primary-color-light, #e0f2fe)",
                 color: theme === "dark" ? "var(--text-on-dark, #e0f2fe)" : "var(--primary-color, #2563eb)",
-                borderRadius: "8px",
+                borderRadius: "6px",
                 textDecoration: "none",
                 textAlign: "center",
                 fontWeight: 600,
                 fontSize: "0.95rem",
                 letterSpacing: "0.3px",
-                transition: "all 0.3s ease",
-                boxShadow: theme === "dark" ? "0 2px 4px rgba(0,0,0,0.2)" : "0 2px 4px rgba(0,0,0,0.05)",
+                transition: "all 0.2s ease",
+                boxShadow: theme === "dark" ? "0 2px 4px rgba(0,0,0,0.15)" : "0 2px 4px rgba(0,0,0,0.04)",
                 border: theme === "dark" ? "1px solid var(--primary-color-dark, #1e40af)" : "1px solid var(--primary-color-lighter, #bfdbfe)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "6px",
-                maxWidth: "100%",
-                width: "fit-content"
+                flexGrow: 1
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = theme === "dark" 
@@ -518,7 +521,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   : "var(--primary-color-lighter, #bfdbfe)";
                 e.currentTarget.style.transform = "translateY(-1px)";
                 e.currentTarget.style.boxShadow = theme === "dark" 
-                  ? "0 4px 8px rgba(0,0,0,0.3)" 
+                  ? "0 4px 8px rgba(0,0,0,0.25)" 
                   : "0 4px 8px rgba(0,0,0,0.08)";
               }}
               onMouseLeave={(e) => {
@@ -527,53 +530,123 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   : "var(--primary-color-light, #e0f2fe)";
                 e.currentTarget.style.transform = "translateY(0)";
                 e.currentTarget.style.boxShadow = theme === "dark" 
-                  ? "0 2px 4px rgba(0,0,0,0.2)" 
-                  : "0 2px 4px rgba(0,0,0,0.05)";
+                  ? "0 2px 4px rgba(0,0,0,0.15)" 
+                  : "0 2px 4px rgba(0,0,0,0.04)";
               }}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                 <polyline points="9 22 9 12 15 12 15 22"></polyline>
               </svg>
               Inicio Wiki
             </Link>
+            <ThemeToggle style={{
+              fontSize: "0.85rem",
+              padding: "3px 6px",
+              flexShrink: 0,
+              margin: "0",
+              width: "auto",
+              height: "auto"
+            }} />
           </div>
+          <h2 style={{ 
+            fontSize: "0.95rem", 
+            marginTop: '0.75rem',
+            marginBottom: '0.75rem', 
+            fontWeight: 600, 
+            color: 'var(--foreground)',
+            letterSpacing: 'var(--letter-spacing)',
+            borderBottom: '1px solid var(--border)',
+            paddingBottom: '0.5rem'
+          }}>
+            Topics y Subtopics
+          </h2>
           
           <div style={{ flex: 1, overflow: 'hidden' }}>
             {loading ? (
-              <div style={{ padding: 12, color: "#888" }}>Cargando temas...</div>
+              <div style={{ 
+                padding: 12, 
+                color: theme === "dark" ? "rgba(255, 255, 255, 0.6)" : "#888"
+              }}>Cargando temas...</div>
             ) : error ? (
-              <div style={{ padding: 12, color: "#c00" }}>Error: {error}</div>
+              <div style={{ 
+                padding: 12, 
+                color: theme === "dark" ? "#f87171" : "#c00"
+              }}>Error: {error}</div>
             ) : tree && tree.length > 0 ? (
-              <PageHierarchyNavigation selectedSlug={slug} />
+              <PageHierarchyNavigation selectedSlug={slug} theme={theme} />
             ) : (
-              <div style={{ padding: 12, color: "#888" }}>No hay temas disponibles.</div>
+              <div style={{ 
+                padding: 12, 
+                color: theme === "dark" ? "rgba(255, 255, 255, 0.6)" : "#888"
+              }}>No hay temas disponibles.</div>
             )}
           </div>
         </div>
       </aside>
       <main className="wiki-main" style={{ 
           gridArea: 'main',
-          padding: '1rem 40px',
+          padding: '2rem 3rem',
           width: '100%',
           boxSizing: 'border-box',
-          transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+          transition: 'all 0.3s ease',
+          maxWidth: '80ch',
+          margin: '1.5rem auto',
+          borderRadius: '8px',
+          background: 'var(--background)',
+          boxShadow: '0 1px 8px rgba(0, 0, 0, 0.03)'
         }}>
         {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "#888" }}>Loading content...</div>
+          <div style={{ 
+            padding: '2rem',
+            textAlign: "center", 
+            color: "var(--muted-foreground)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "1rem"
+          }}>
+            <div style={{ fontSize: "1.5rem" }}>Loading content...</div>
+          </div>
         ) : error ? (
-          <div style={{ padding: 32, textAlign: "center", color: "#c00" }}>Error: {error}</div>
+          <div style={{ 
+            padding: '2rem',
+            textAlign: "center", 
+            color: "#c00",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "1rem"
+          }}>
+            <div style={{ fontSize: "1.25rem" }}>Error: {error}</div>
+          </div>
         ) : slug && !selected ? (
-          <div style={{ padding: 32, textAlign: "center", color: "#c00" }}>Topic not found for slug: <b>{slug}</b></div>
+          <div style={{ 
+            padding: '2rem',
+            textAlign: "center", 
+            color: "#c00",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "1rem"
+          }}>
+            <div style={{ fontSize: "1.25rem" }}>Topic not found for slug: <b>{slug}</b></div>
+          </div>
         ) : slug && selected ? (
           <div>
-            <h3>{selected.label}</h3>
+            <h1 style={{ 
+              marginTop: '0.5rem',
+              fontSize: 'calc(var(--text-base-size) * var(--text-scale-ratio) * var(--text-scale-ratio) * var(--text-scale-ratio))',
+              fontWeight: '700',
+              letterSpacing: '-0.01em',
+              lineHeight: '1.3'
+            }}>{selected.label}</h1>
             {/* Pass the entire content object if it's the Tiptap JSON */}
             {selected.content
               ? <RichTextRenderer 
                   content={getPaginatedContent(selected.content, currentPage, pageSize)} 
                 /> 
-              : <em>No content available</em>
+              : <em style={{ color: 'var(--muted-foreground)' }}>No content available</em>
             }
             {/* Componente de paginación para contenido extenso */}
             {selected.content && totalPages > 1 && (
@@ -610,8 +683,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           justifyContent: "center",
           fontSize: 20,
           cursor: "pointer",
-          boxShadow: "0 1px 4px 0 #0001",
-          transition: "right 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s, color 0.3s"
+          boxShadow: "0 1px 4px rgba(0, 0, 0, 0.03)",
+          transition: "right 0.3s ease, background-color 0.3s, color 0.3s"
         }}
         aria-label={graphOpen ? "Hide graph panel" : "Show graph panel"}
       >
@@ -626,19 +699,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           right: '0',
           height: '100vh',
           width: graphOpen ? '340px' : '0',
-          overflow: graphOpen ? 'auto' : 'hidden',
-          padding: graphOpen ? '50px 15px 15px 15px' : '0',
-          transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          overflowY: graphOpen ? 'auto' : 'hidden',
+          overflowX: 'hidden',
+          padding: graphOpen ? '60px 20px 20px 20px' : '0',
+          transition: 'all 0.3s ease',
           visibility: graphOpen ? 'visible' : 'hidden',
           opacity: graphOpen ? '1' : '0',
           zIndex: 50,
-          boxShadow: graphOpen ? '-2px 0 8px rgba(0,0,0,0.1)' : 'none'
+          background: 'var(--aside-bg)',
+          borderLeft: '1px solid var(--border)',
+          boxShadow: graphOpen ? '-1px 0 6px rgba(0, 0, 0, 0.03)' : 'none'
         }}
       >
         <LargeKnowledgeGraph />
-        <div className="wiki-related">
-          <WikiHeadingsLinks />
-        </div>
+        <WikiHeadingsLinks />
       </aside>
     </div>
   );
