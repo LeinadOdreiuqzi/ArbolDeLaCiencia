@@ -1,31 +1,60 @@
 @import "tailwindcss";
 
+/* Tema claro con colores optimizados para reducir fatiga visual */
 :root {
-  --background: #fff;
-  --foreground: #1a1a1a;
-  --nav-bg: #f7f7fa;
-  --aside-bg: #fafbff;
-  --border: #e0e0e0;
-  --muted-foreground: #52525b; /* Tailwind zinc-600 */
-  --accent-color: #2563eb; /* Tailwind blue-600 */
-  --paragraph-spacing: 1.5lh;
-  --text-base-size: 1.18rem;
+  /* Colores base con tono ligeramente menos brillante para largas lecturas */
+  --background: #f8f9fa; /* Ligeramente grisáceo en lugar de blanco puro */
+  --foreground: #283044; /* Azul muy oscuro en lugar de negro puro */
+  --nav-bg: #f0f2f5; /* Tono más suave para la navegación */
+  --aside-bg: #f5f7fa; /* Fondo de panel lateral suave */
+  --border: #e2e8f0; /* Borde más suave */
+  --muted-foreground: #64748b; /* Gris azulado para texto secundario */
+  --accent-color: #3b82f6; /* Azul más brillante pero no agresivo */
+  
+  /* Propiedades de texto para mejor legibilidad */
+  --paragraph-spacing: 1.6lh; /* Ligeramente más espaciado */
+  --text-base-size: 1.125rem; /* Tamaño base ligeramente más pequeño para mayor confort */
   --text-scale-ratio: 1.2;
+  --letter-spacing: 0.01em; /* Espaciado entre letras ligeramente aumentado */
+  --line-height: 1.75; /* Altura de línea aumentada para mejor legibilidad */
 }
 
-/* Removed @theme inline block as it is not valid CSS */
-
-[data-theme="dark"] {
-  --background: #18181b;
-  --foreground: #f8f8f8;
-  --nav-bg: #232329;
-  --aside-bg: #20212b;
-  --border: #2a2a35;
-  --muted-foreground: #b4b4bc; /* Mejor contraste en modo oscuro */
-  --accent-color: #60a5fa; /* Tailwind blue-400 */
-  --paragraph-spacing: 1.5lh;
-  --text-base-size: 1.18rem;
+/* Tema sepia optimizado para lectura prolongada */
+[data-theme="sepia"] {
+  /* Colores base inspirados en papel antiguo */
+  --background: #f8f4e9; /* Fondo color papel suave */
+  --foreground: #433422; /* Marrón oscuro para mejor contraste sin ser negro */
+  --nav-bg: #f2ead7; /* Tono sepia más pronunciado para navegación */
+  --aside-bg: #f5f1e4; /* Sepia claro para paneles laterales */
+  --border: #e6d9be; /* Borde color arena */
+  --muted-foreground: #73624c; /* Marrón medio para texto secundario */
+  --accent-color: #9c6644; /* Tono terroso complementario */
+  
+  /* Propiedades de texto */
+  --paragraph-spacing: 1.6lh;
+  --text-base-size: 1.125rem;
   --text-scale-ratio: 1.2;
+  --letter-spacing: 0.015em; /* Mayor espaciado de letras para tema sepia */
+  --line-height: 1.75;
+}
+
+/* Tema oscuro con colores optimizados para reducir fatiga visual nocturna */
+[data-theme="dark"] {
+  /* Colores base con tonos no puros para reducir contraste agresivo */
+  --background: #1a1b26; /* Azul muy oscuro en lugar de negro puro */
+  --foreground: #e3e6ec; /* Gris claro azulado en lugar de blanco puro */
+  --nav-bg: #24273a; /* Tono oscuro con matiz para navegación */
+  --aside-bg: #222436; /* Panel lateral con tono azulado */
+  --border: #363b54; /* Borde visible pero no estridente */
+  --muted-foreground: #a9b1d6; /* Lavanda grisáceo para texto secundario */
+  --accent-color: #7aa2f7; /* Azul apagado para acentos */
+  
+  /* Propiedades de texto */
+  --paragraph-spacing: 1.6lh;
+  --text-base-size: 1.125rem;
+  --text-scale-ratio: 1.2;
+  --letter-spacing: 0.015em; /* Mayor espaciado para mejor legibilidad en fondo oscuro */
+  --line-height: 1.8; /* Altura de línea extra para fondo oscuro */
 }
 
 body {
@@ -33,7 +62,11 @@ body {
   color: var(--foreground);
   font-family: 'Geist', Arial, Helvetica, sans-serif;
   font-size: var(--text-base-size);
-  line-height: 1.7;
+  line-height: var(--line-height, 1.75);
+  letter-spacing: var(--letter-spacing, 0.01em);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .wiki-layout {
