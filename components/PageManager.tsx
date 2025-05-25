@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import RichTextRenderer from "./RichTextRenderer";
 import dynamic from 'next/dynamic';
+import { Editor } from "@tiptap/react"; // Import Editor type
+import EditorTableOfContents from "./EditorTableOfContents"; // Import the new ToC component
 
 const SimpleEditor = dynamic(() => import('./SimpleEditor'), {
   ssr: false,
@@ -60,6 +62,9 @@ function TreeNode({ node, onSelect, selectedId }: { node: any, onSelect: (n: any
 }
 
 export default function PageManager() {
+  const [isHierarchyVisible, setIsHierarchyVisible] = useState(true);
+  const [isPreviewModeActive, setIsPreviewModeActive] = useState(false);
+  const [activeEditorInstance, setActiveEditorInstance] = useState<Editor | null>(null);
   const [pages, setPages] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<number|null>(null);
   const [loading, setLoading] = useState(false); 
@@ -284,11 +289,26 @@ export default function PageManager() {
 
   return (
     <div style={{ display: "flex", height: "calc(100vh - 100px)" }}>
-      {/* Sidebar */} 
-      <div style={{ width: 300, borderRight: "1px solid #ccc", padding: 10, overflowY: "auto" }}>
-        <h2>Jerarquía</h2>
-        {loading && <p>Cargando árbol...</p>}
-        {error && <p style={{ color: 'red' }}>{error}</p>}
+      {/* Sidebar */}
+      <div style={{ 
+          width: isHierarchyVisible ? 300 : 0, 
+          borderRight: isHierarchyVisible ? "1px solid #ccc" : "none", 
+          padding: isHierarchyVisible ? 10 : 0, 
+          overflowY: "auto",
+          transition: "width 0.3s ease-in-out", // Smooth transition
+          whiteSpace: "nowrap", // Prevent content wrapping during transition
+          overflowX: "hidden" // Hide content that overflows during transition
+        }}>
+        <button 
+          onClick={() => setIsHierarchyVisible(!isHierarchyVisible)} 
+          style={{ marginBottom: 10 }}
+        >
+          {isHierarchyVisible ? "Ocultar Navegación" : "Mostrar Navegación"}
+        </button>
+        <div style={{ display: isHierarchyVisible ? 'block' : 'none' }}>
+          <h2>Jerarquía</h2>
+          {loading && <p>Cargando árbol...</p>}
+          {error && <p style={{ color: 'red' }}>{error}</p>}
         {!loading && !error && pages.length > 0 && (
           tree.map(rootNode => (
             <TreeNode key={rootNode.id} node={rootNode} onSelect={handleSelectNodeWithGuard} selectedId={selectedId!} />
@@ -305,45 +325,88 @@ export default function PageManager() {
            {/* Show Contenido button if a level 3+ item is selected, enable only if level 3 is selected */}
            {selectedLevel >= 3 && <button onClick={handleCreateContenido} disabled={selectedLevel !== 3}>+ Nuevo Contenido</button>}
          </div>
+        </div>
       </div>
 
-      {/* Editor Area */} 
-      <div style={{ flex: 1, padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-        {selectedPage ? (
-          <>
-            <input
-              type="text"
-              value={editTitle || selectedPage.title}
-              onChange={(e) => setEditTitle(e.target.value)}
-              onBlur={handleSaveClick} // Save title on blur maybe?
-              style={{ fontSize: '1.5em', fontWeight: 'bold', marginBottom: 15, padding: '5px', border: '1px solid #ddd', borderRadius: '4px' }}
-            />
-            <div style={{ flex: 1 /* Make editor container fill space */ }}>
-              <div style={{ marginBottom: '10px', padding: '8px', backgroundColor: '#f0f7ff', borderRadius: '4px', fontSize: '0.9em' }}>
-                <strong>Nota:</strong> El contenido extenso se paginará automáticamente en la visualización. No es necesario dividir manualmente el contenido en páginas.
+      {/* Editor Area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+        {/* Main Editor Content */}
+        <div style={{ flex: 3, padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          {selectedPage ? (
+            <>
+              {/* Preview Toggle Button - Positioned above title/editor */}
+              <div style={{ marginBottom: 15, display: 'flex', justifyContent: 'flex-end' }}>
+                <button 
+                  onClick={() => setIsPreviewModeActive(!isPreviewModeActive)}
+                  style={{ padding: '8px 12px', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  {isPreviewModeActive ? "Volver al Editor" : "Previsualizar Contenido"}
+                </button>
               </div>
-              <SimpleEditor
-                key={selectedPage.id} // Ensure editor re-mounts cleanly on page change
-                content={draftContent}
-                initialContent={selectedPage.content} // Pasar el contenido inicial desde la BD
-                onChange={handleDraftChange}
-              />
-            </div>
-            <div style={{ marginTop: 15, display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button onClick={handleSaveClick} disabled={!draftChanged || saveLoading}>
-                {saveLoading ? "Guardando..." : "Guardar Cambios"}
-              </button>
-              <button onClick={handleUndoDraft} disabled={!draftChanged || saveLoading}>Descartar</button>
-              {showSaveNotice && <span style={{ color: 'green' }}>Guardado ✓</span>}
-              {showErrorNotice && <span style={{ color: 'red' }}>{showErrorNotice}</span>}
-              {!draftChanged && !showSaveNotice && !showErrorNotice && <span style={{ color: '#888' }}>Contenido al día</span>}
-            </div>
-          </>
-        ) : (
-          <p>Selecciona una página del árbol para ver o editar su contenido.</p>
+
+              {!isPreviewModeActive ? (
+                <>
+                  {/* Existing Title Input */}
+                  <input
+                    type="text"
+                    value={editTitle || selectedPage.title}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    onBlur={handleSaveClick}
+                    style={{ fontSize: '1.5em', fontWeight: 'bold', marginBottom: 15, padding: '5px', border: '1px solid #ddd', borderRadius: '4px' }}
+                  />
+                  {/* Existing "Nota:" div */}
+                  <div style={{ marginBottom: '10px', padding: '8px', backgroundColor: '#f0f7ff', borderRadius: '4px', fontSize: '0.9em' }}>
+                    <strong>Nota:</strong> El contenido extenso se paginará automáticamente en la visualización. No es necesario dividir manualmente el contenido en páginas.
+                  </div>
+                  {/* Existing SimpleEditor component */}
+                  <SimpleEditor
+                    key={selectedPage.id}
+                    content={draftContent}
+                    initialContent={selectedPage.content}
+                    onChange={handleDraftChange}
+                    onEditorReady={setActiveEditorInstance}
+                  />
+                  {/* Existing Save/Undo buttons and notices */}
+                  <div style={{ marginTop: 15, display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <button onClick={handleSaveClick} disabled={!draftChanged || saveLoading}>
+                      {saveLoading ? "Guardando..." : "Guardar Cambios"}
+                    </button>
+                    <button onClick={handleUndoDraft} disabled={!draftChanged || saveLoading}>Descartar</button>
+                    {showSaveNotice && <span style={{ color: 'green' }}>Guardado ✓</span>}
+                    {showErrorNotice && <span style={{ color: 'red' }}>{showErrorNotice}</span>}
+                    {!draftChanged && !showSaveNotice && !showErrorNotice && <span style={{ color: '#888' }}>Contenido al día</span>}
+                  </div>
+                </>
+              ) : (
+                // Preview Mode Content
+                <div style={{paddingTop: '10px'}}>
+                  <h2 style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: 20 }}>
+                    {editTitle || selectedPage.title}
+                  </h2>
+                  <div className="prose-preview" /* Optional class for preview-specific styling */>
+                    <RichTextRenderer content={draftContent} />
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <p>Selecciona una página del árbol para ver o editar su contenido.</p>
+          )}
+        </div>
+        {/* Table of Contents Area - Conditionally hidden in preview mode */}
+        {!isPreviewModeActive && selectedPage && (
+          <div style={{ 
+            flex: 1, 
+            padding: "20px 20px 20px 0px", 
+            borderLeft: "1px solid #ccc", 
+            overflowY: "auto", 
+            display: 'flex', 
+            flexDirection: 'column',
+          }}>
+            <EditorTableOfContents editor={activeEditorInstance} />
+          </div>
         )}
       </div>
-
       {/* Modal de confirmación */}
       {showUnsavedModal && (
           <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', padding: '30px', border: '1px solid #ccc', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', zIndex: 1001 }}>

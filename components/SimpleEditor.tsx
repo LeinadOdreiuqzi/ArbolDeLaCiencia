@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useEditor, EditorContent, ReactNodeViewRenderer } from '@tiptap/react'
+import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Link from '@tiptap/extension-link'
@@ -11,10 +11,39 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
-import { Node, NodeViewWrapper } from '@tiptap/react'
+import { Node, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
+import { PasteRule } from '@tiptap/core'
+import { EmbedFrameExtension } from './EmbedNode' // Import the new EmbedFrameExtension
+import { CitationMark } from './CitationMark' // Import the new CitationMark
+import ResizableImageNodeView from './ResizableImageNodeView' // Import the custom node view
 
 // Estilos para el editor
 import './SimpleEditor.css'
+
+// Helper function to convert video URLs to embeddable format
+function getVideoEmbedUrl(url: string): string | null {
+  let embedUrl = url;
+  if (url.includes('youtube.com/watch') || url.includes('youtu.be')) {
+    const videoIdMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+    const videoId = videoIdMatch ? videoIdMatch[1] : null;
+    if (videoId) {
+      embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    } else {
+      return null; // Not a valid YouTube URL for embedding
+    }
+  } else if (url.includes('vimeo.com')) {
+    const videoIdMatch = url.match(/vimeo\.com\/(?:video\/)?([0-9]+)/);
+    const videoId = videoIdMatch ? videoIdMatch[1] : null;
+    if (videoId) {
+      embedUrl = `https://player.vimeo.com/video/${videoId}`;
+    } else {
+      return null; // Not a valid Vimeo URL for embedding
+    }
+  } else {
+    return null; // Not a YouTube or Vimeo URL
+  }
+  return embedUrl;
+}
 
 // Componente para insertar videos embebidos
 const VideoComponent = (props: any) => {
@@ -47,20 +76,45 @@ const VideoExtension = Node.create({
   parseHTML() {
     return [
       {
-        tag: 'div[data-type="video"]',
+        tag: 'iframe[src*="youtube.com"], iframe[src*="vimeo.com"]', // For parsing existing iframes if any
       },
+      {
+        tag: 'div[data-type="video"]', // For custom representation
+      }
     ]
   },
   renderHTML({ HTMLAttributes }) {
-    return ['div', { 'data-type': 'video', ...HTMLAttributes }]
+    // Return an iframe for semantic HTML, but our NodeView will take over rendering
+    return ['iframe', { ...HTMLAttributes, 'data-type': 'video', frameBorder: 0, allowfullscreen: '' }];
   },
   addNodeView() {
     return ReactNodeViewRenderer(VideoComponent)
+  },
+  addPasteRules() {
+    return [
+      new PasteRule({
+        find: /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|vimeo\.com\/)\S+/g,
+        handler: ({ state, range, match }) => {
+          const url = match[0];
+          const embedUrl = getVideoEmbedUrl(url);
+
+          if (embedUrl) {
+            const { tr } = state;
+            const node = state.schema.nodes.video.create({ src: embedUrl });
+            tr.replaceWith(range.from, range.to, node);
+          }
+        },
+      }),
+    ]
   },
 })
 
 const MenuBar = ({ editor }: { editor: any }) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const citationData = useRef({
+    sources: new Map<string, string>(),
+    nextId: 1
+  })
 
   if (!editor) {
     return null
@@ -88,30 +142,15 @@ const MenuBar = ({ editor }: { editor: any }) => {
   const insertVideo = () => {
     const url = window.prompt('Ingresa la URL del video (YouTube, Vimeo, etc.)')
     if (url) {
-      // Procesar URL para obtener el formato embebido correcto
-      let embedUrl = url
-      
-      // Convertir URL de YouTube a formato embebido
-      if (url.includes('youtube.com/watch') || url.includes('youtu.be')) {
-        const videoId = url.includes('youtube.com/watch') 
-          ? new URL(url).searchParams.get('v')
-          : url.split('/').pop()
-        if (videoId) {
-          embedUrl = `https://www.youtube.com/embed/${videoId}`
-        }
+      const embedUrl = getVideoEmbedUrl(url);
+      if (embedUrl) {
+        editor.chain().focus().insertContent({
+          type: 'video',
+          attrs: { src: embedUrl }
+        }).run()
+      } else {
+        alert("URL de video no válida o no soportada.");
       }
-      // Convertir URL de Vimeo a formato embebido
-      else if (url.includes('vimeo.com')) {
-        const videoId = url.split('/').pop()
-        if (videoId) {
-          embedUrl = `https://player.vimeo.com/video/${videoId}`
-        }
-      }
-      
-      editor.chain().focus().insertContent({
-        type: 'video',
-        attrs: { src: embedUrl }
-      }).run()
     }
   }
 
@@ -262,6 +301,50 @@ const MenuBar = ({ editor }: { editor: any }) => {
         >
           <span className="icon">🔗</span>
         </button>
+        <button
+          onClick={() => {
+            const url = window.prompt('Ingresa la URL SRC del iframe a embeber:')
+            if (url) {
+              if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
+                alert('URL inválida. Debe comenzar con http:// o https://');
+                return;
+              }
+              editor.chain().focus().insertContent({
+                type: 'embedFrame', // Name of the EmbedFrameExtension node
+                attrs: { src: url },
+              }).run()
+            }
+          }}
+          title="Embeber Iframe"
+        >
+          <span className="icon">{'{...}'}</span>
+        </button>
+        <button
+          onClick={() => {
+            if (!editor) return;
+            const { from, to, empty } = editor.state.selection;
+            if (empty) {
+              alert('Por favor, selecciona el texto que deseas citar.');
+              return;
+            }
+
+            const sourceText = window.prompt('Ingresa el texto fuente de la cita (ej: Autor, Año, Título):');
+            if (!sourceText) return;
+
+            let citationId = citationData.current.sources.get(sourceText);
+            if (!citationId) {
+              citationId = String(citationData.current.nextId++);
+              citationData.current.sources.set(sourceText, citationId);
+            }
+            
+            // The toggleCitation command was defined in CitationMark.ts
+            editor.chain().focus().toggleMark('citation', { citationId, sourceText }).run();
+          }}
+          className={editor?.isActive('citation') ? 'is-active' : ''}
+          title="Añadir/Quitar Cita"
+        >
+          <span className="icon">[1]</span>
+        </button>
       </div>
 
       <div className="menu-section">
@@ -311,10 +394,15 @@ interface SimpleEditorProps {
   content: any;
   onChange: (content: any) => void;
   initialContent?: any;
+  onEditorReady?: (editor: any) => void; // Changed 'Editor' to 'any' to avoid import issues here, Tiptap Editor type
 }
 
-const SimpleEditor = ({ content, onChange, initialContent }: SimpleEditorProps) => {
-  const [isReady, setIsReady] = useState(false)
+const SimpleEditor = ({ content, onChange, initialContent, onEditorReady }: SimpleEditorProps) => {
+  const [isReady, setIsReady] = useState(false);
+  const citationData = useRef<{ sources: Map<string, string>; nextId: number }>({
+    sources: new Map(),
+    nextId: 1,
+  });
   
   // Usar useEffect para manejar la carga inicial del contenido desde la BD
   useEffect(() => {
@@ -325,7 +413,12 @@ const SimpleEditor = ({ content, onChange, initialContent }: SimpleEditorProps) 
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        // Ensure headings have levels needed for ToC
+        heading: {
+          levels: [1, 2, 3, 4], 
+        },
+      }),
       Placeholder.configure({
         placeholder: 'Escribe algo…',
       }),
@@ -338,7 +431,81 @@ const SimpleEditor = ({ content, onChange, initialContent }: SimpleEditorProps) 
       }),
       Image.configure({
         allowBase64: true,
-        inline: true,
+        inline: true, // Keep images inline
+        // HTMLAttributes are used by renderHTML for the main <img> tag
+        HTMLAttributes: {
+          class: 'tiptap-image', // Added a class for general styling if needed
+        },
+      }).extend({
+        // First, extend to add custom attributes for width and height
+        addAttributes() {
+          return {
+            ...this.parent?.(), // Retain existing attributes (src, alt, title)
+            width: {
+              default: null,
+              parseHTML: element => element.style.width || element.getAttribute('width'),
+              renderHTML: attributes => {
+                if (!attributes.width) return {};
+                return { width: attributes.width };
+              },
+            },
+            height: {
+              default: null,
+              parseHTML: element => element.style.height || element.getAttribute('height'),
+              renderHTML: attributes => {
+                if (!attributes.height) return {};
+                return { height: attributes.height };
+              },
+            },
+            // style attribute to allow floating and other styles if needed in future
+            style: {
+                default: null,
+                parseHTML: element => element.getAttribute('style'),
+                renderHTML: attributes => {
+                    if (!attributes.style) return {};
+                    return { style: attributes.style };
+                }
+            }
+          };
+        },
+        // Then, extend again to add the paste rules (if this chaining is problematic, combine extends)
+      }).extend({
+        addPasteRules() {
+          return [
+            new PasteRule({
+              find: /https?:\/\/\S+\.(?:png|jpe?g|gif|webp|bmp|svg|tiff|ico)\S*/g,
+              handler: ({ state, range, match }) => {
+                const url = match[0];
+                const pastedText = state.doc.textBetween(range.from, range.to, " ");
+                if (url.trim() === pastedText.trim()) {
+                  // Create node with src, let NodeView handle initial size via natural dimensions if w/h not set
+                  state.tr.replaceWith(range.from, range.to, this.type.create({ src: url }));
+                }
+              },
+            }),
+          ];
+        },
+        // Finally, extend to add the custom node view
+      }).extend({
+        addNodeView() {
+          return ReactNodeViewRenderer(ResizableImageNodeView);
+        },
+        // Ensure renderHTML from the base Image extension is still somewhat respected
+        // The NodeView will take over rendering, but this can be a fallback or for static output
+        renderHTML({ node, HTMLAttributes }) {
+            // HTMLAttributes from addAttributes will include width/height if they exist
+            // The default Image extension's renderHTML is ['img', HTMLAttributes]
+            // We need to ensure our width/height are included
+            const { width, height, style } = node.attrs;
+            const attrs = { ...HTMLAttributes };
+            if (width) attrs.width = String(width); // Ensure it's string for HTML
+            if (height) attrs.height = String(height);
+            if (style) attrs.style = style;
+            
+            // If inline, Tiptap often wraps in a span. Our NodeView uses span as wrapper.
+            // For static HTML, just outputting 'img' is fine.
+            return ['img', attrs];
+        }
       }),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
@@ -352,12 +519,48 @@ const SimpleEditor = ({ content, onChange, initialContent }: SimpleEditorProps) 
       TableHeader,
       TableCell,
       VideoExtension,
+      EmbedFrameExtension, // Add the new extension here
+      CitationMark, // Add the new citation mark here
     ],
     content: initialContent || content,
     onUpdate: ({ editor }) => {
       onChange(editor.getJSON())
     },
   })
+
+  // Call onEditorReady when editor is initialized
+  useEffect(() => {
+    if (editor && onEditorReady) {
+      onEditorReady(editor);
+    }
+    // Optional: Cleanup if onEditorReady needs to be recalled if editor instance changes
+    // return () => { if (editor) { /* editor.destroy() or similar if needed */ } }
+  }, [editor, onEditorReady]);
+
+  // Populate citation data from existing content when editor is created or content changes.
+  useEffect(() => {
+    if (editor && (content || initialContent)) {
+      const newSources = new Map<string, string>();
+      let maxId = 0;
+      editor.state.doc.descendants((node, pos) => {
+        node.marks.forEach(mark => {
+          if (mark.type.name === 'citation') {
+            const { citationId, sourceText } = mark.attrs;
+            if (citationId && sourceText) {
+              newSources.set(sourceText, citationId);
+              const numericId = parseInt(citationId, 10);
+              if (!isNaN(numericId) && numericId > maxId) {
+                maxId = numericId;
+              }
+            }
+          }
+        });
+      });
+      citationData.current.sources = newSources;
+      citationData.current.nextId = maxId + 1;
+    }
+  }, [editor, content, initialContent]);
+
 
   // Actualizar el contenido del editor cuando cambia externamente
   useEffect(() => {
@@ -367,15 +570,16 @@ const SimpleEditor = ({ content, onChange, initialContent }: SimpleEditorProps) 
       const newContent = JSON.stringify(content)
       
       if (currentContent !== newContent) {
-        editor.commands.setContent(content, false)
+        // Prevent re-triggering onUpdate by providing a different transaction source
+        editor.commands.setContent(content, false, { preserveWhitespace: 'full' })
       }
     }
   }, [editor, content])
 
   return (
-    <div className="simple-editor">
+    <div className="simple-editor" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <MenuBar editor={editor} />
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} style={{ flexGrow: 1, overflowY: 'auto' }}/>
     </div>
   )
 }
