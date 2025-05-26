@@ -64,6 +64,7 @@ function TreeNode({ node, onSelect, selectedId }: { node: any, onSelect: (n: any
 export default function PageManager() {
   const [isHierarchyVisible, setIsHierarchyVisible] = useState(true);
   const [isPreviewModeActive, setIsPreviewModeActive] = useState(false);
+  const [isTocVisible, setIsTocVisible] = useState(true); // New state for ToC visibility
   const [activeEditorInstance, setActiveEditorInstance] = useState<Editor | null>(null);
   const [pages, setPages] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<number|null>(null);
@@ -289,42 +290,49 @@ export default function PageManager() {
 
   return (
     <div style={{ display: "flex", height: "calc(100vh - 100px)" }}>
-      {/* Sidebar */}
-      <div style={{ 
-          width: isHierarchyVisible ? 300 : 0, 
-          borderRight: isHierarchyVisible ? "1px solid #ccc" : "none", 
-          padding: isHierarchyVisible ? 10 : 0, 
-          overflowY: "auto",
-          transition: "width 0.3s ease-in-out", // Smooth transition
-          whiteSpace: "nowrap", // Prevent content wrapping during transition
-          overflowX: "hidden" // Hide content that overflows during transition
-        }}>
+      {/* New Parent Container for Left Section (Button + Panel) */}
+      <div style={{ display: "flex", flexDirection: "column", borderRight: "1px solid #ccc" }}>
         <button 
           onClick={() => setIsHierarchyVisible(!isHierarchyVisible)} 
-          style={{ marginBottom: 10 }}
+          style={{ 
+            padding: "5px 10px",
+            margin: "10px",
+            alignSelf: "flex-start"
+          }}
         >
           {isHierarchyVisible ? "Ocultar Navegación" : "Mostrar Navegación"}
         </button>
-        <div style={{ display: isHierarchyVisible ? 'block' : 'none' }}>
-          <h2>Jerarquía</h2>
-          {loading && <p>Cargando árbol...</p>}
-          {error && <p style={{ color: 'red' }}>{error}</p>}
-        {!loading && !error && pages.length > 0 && (
-          tree.map(rootNode => (
-            <TreeNode key={rootNode.id} node={rootNode} onSelect={handleSelectNodeWithGuard} selectedId={selectedId!} />
-          ))
-        )}
-         <hr style={{ margin: '15px 0' }}/>
-         {/* Botones para crear nuevos elementos */} 
-         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-           <button onClick={handleCreateArea}>+ Nueva Área</button>
-           {/* Show Especialidad button if a level 1+ item is selected, enable only if level 1 is selected */}
-           {selectedLevel >= 1 && <button onClick={handleCreateEspecialidad} disabled={selectedLevel !== 1}>+ Nueva Especialidad</button>}
-           {/* Show Tema button if a level 2+ item is selected, enable only if level 2 is selected */}
-           {selectedLevel >= 2 && <button onClick={handleCreateTema} disabled={selectedLevel !== 2}>+ Nuevo Tema</button>}
-           {/* Show Contenido button if a level 3+ item is selected, enable only if level 3 is selected */}
-           {selectedLevel >= 3 && <button onClick={handleCreateContenido} disabled={selectedLevel !== 3}>+ Nuevo Contenido</button>}
-         </div>
+        {/* Collapsible Panel */}
+        <div style={{ 
+          width: isHierarchyVisible ? 300 : 0, 
+          padding: isHierarchyVisible ? "0 10px 10px 10px" : 0,
+          overflowY: "auto",
+          transition: "width 0.3s ease-in-out, padding 0.3s ease-in-out",
+          whiteSpace: "nowrap", 
+          overflowX: "hidden" 
+        }}>
+          {/* Inner content visibility still controlled */}
+          <div style={{ display: isHierarchyVisible ? 'block' : 'none' }}> 
+            <h2>Jerarquía</h2>
+            {loading && <p>Cargando árbol...</p>}
+            {error && <p style={{ color: 'red' }}>{error}</p>}
+            {!loading && !error && pages.length > 0 && (
+              tree.map(rootNode => (
+                <TreeNode key={rootNode.id} node={rootNode} onSelect={handleSelectNodeWithGuard} selectedId={selectedId!} />
+              ))
+            )}
+            <hr style={{ margin: '15px 0' }}/>
+            {/* Botones para crear nuevos elementos */} 
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button onClick={handleCreateArea}>+ Nueva Área</button>
+              {/* Show Especialidad button if a level 1+ item is selected, enable only if level 1 is selected */}
+              {selectedLevel >= 1 && <button onClick={handleCreateEspecialidad} disabled={selectedLevel !== 1}>+ Nueva Especialidad</button>}
+              {/* Show Tema button if a level 2+ item is selected, enable only if level 2 is selected */}
+              {selectedLevel >= 2 && <button onClick={handleCreateTema} disabled={selectedLevel !== 2}>+ Nuevo Tema</button>}
+              {/* Show Contenido button if a level 3+ item is selected, enable only if level 3 is selected */}
+              {selectedLevel >= 3 && <button onClick={handleCreateContenido} disabled={selectedLevel !== 3}>+ Nuevo Contenido</button>}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -393,17 +401,40 @@ export default function PageManager() {
             <p>Selecciona una página del árbol para ver o editar su contenido.</p>
           )}
         </div>
-        {/* Table of Contents Area - Conditionally hidden in preview mode */}
+        {/* New Parent Container for Right ToC Section (Button + Panel) */}
         {!isPreviewModeActive && selectedPage && (
           <div style={{ 
-            flex: 1, 
-            padding: "20px 20px 20px 0px", 
-            borderLeft: "1px solid #ccc", 
-            overflowY: "auto", 
-            display: 'flex', 
-            flexDirection: 'column',
+            display: "flex", 
+            flexDirection: "column", 
+            borderLeft: "1px solid #ccc" // Border on the parent container
           }}>
-            <EditorTableOfContents editor={activeEditorInstance} />
+            <button 
+              onClick={() => setIsTocVisible(!isTocVisible)} 
+              style={{ 
+                margin: "10px 10px 0 10px", // Margin for spacing
+                padding: "5px",
+                alignSelf: "flex-start" 
+              }}
+            >
+              {isTocVisible ? "Ocultar ToC" : "Mostrar ToC"}
+            </button>
+            {/* Collapsible ToC Content Panel */}
+            <div style={{
+              flex: 1, // Takes available space in the column
+              width: isTocVisible ? 250 : 0, // Animate width (adjust as needed)
+              padding: isTocVisible ? "10px 10px 10px 0px" : 0, // Animate padding (adjust right padding)
+              overflowY: "auto",
+              overflowX: "hidden", // Hide content that overflows during transition
+              transition: "width 0.3s ease-in-out, padding 0.3s ease-in-out",
+              display: 'flex', // Keep as flex to allow EditorTableOfContents to fill height
+              flexDirection: 'column',
+              visibility: isTocVisible ? 'visible' : 'hidden', // Use visibility for smoother transition with padding
+            }}>
+              {/* Inner content visibility still controlled by isTocVisible to prevent rendering when hidden */}
+              <div style={{ display: isTocVisible ? 'block' : 'none', flexShrink: 0 /* Prevent shrinking */ }}>
+                <EditorTableOfContents editor={activeEditorInstance} />
+              </div>
+            </div>
           </div>
         )}
       </div>

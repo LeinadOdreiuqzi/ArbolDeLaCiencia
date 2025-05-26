@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { NodeViewWrapper, NodeViewProps, ReactNodeViewRenderer } from '@tiptap/react';
+import styles from './ResizableImageNodeView.module.css';
 
 export const ResizableImageNodeView: React.FC<NodeViewProps> = ({ node, updateAttributes, editor }) => {
   const imgRef = useRef<HTMLImageElement>(null);
@@ -108,17 +109,33 @@ export const ResizableImageNodeView: React.FC<NodeViewProps> = ({ node, updateAt
   const displayWidth = width ? `${width}px` : 'auto';
   const displayHeight = height ? `${height}px` : 'auto';
 
+  // Get float attribute
+  const floatValue = node.attrs.float || 'none';
+
+  // Base style for NodeViewWrapper
+  const wrapperStyle: React.CSSProperties = {
+    display: 'inline-block', // Crucial for inline images to have size & handles
+    position: 'relative',    // For positioning resize handle
+    lineHeight: '0',         // To prevent extra space below the image if it's inline
+    border: editor.isEditable && (editor.state.selection as any).node === node ? '2px solid blue' : 'none',
+    userSelect: 'none',      // Prevent text selection during resize
+    // Apply float styles
+    float: floatValue as 'left' | 'right' | 'none', // Cast to expected type
+  };
+
+  if (floatValue === 'left') {
+    wrapperStyle.marginRight = '1em';
+    wrapperStyle.marginBottom = '0.5em';
+  } else if (floatValue === 'right') {
+    wrapperStyle.marginLeft = '1em';
+    wrapperStyle.marginBottom = '0.5em';
+  }
+  // If floatValue is 'none', no additional margins are needed beyond what float:none implies.
+
   return (
     <NodeViewWrapper 
         as="span" // Important for inline behavior
-        style={{ 
-            display: 'inline-block', // Crucial for inline images to have size & handles
-            position: 'relative', // For positioning resize handle
-            lineHeight: '0', // To prevent extra space below the image if it's inline
-            // If node is selected, show a border
-            border: editor.isEditable && (editor.state.selection as any).node === node ? '2px solid blue' : 'none',
-            userSelect: 'none', // Prevent text selection during resize
-        }}
+        style={wrapperStyle}
         draggable="true" // Tiptap's default image is draggable
         data-drag-handle // Tiptap's default image is draggable
     >
@@ -130,9 +147,9 @@ export const ResizableImageNodeView: React.FC<NodeViewProps> = ({ node, updateAt
         style={{ 
             width: displayWidth, 
             height: displayHeight,
-            cursor: 'default', // Default cursor for image itself
+            // cursor: 'default', // Default cursor for image itself - moved to CSS module
         }}
-        className={editor.isEditable ? 'tiptap-resizable-image' : ''}
+        className={`${styles.resizableImage} ${editor.isEditable ? 'tiptap-resizable-image' : ''}`} // Added module class, kept tiptap global class for now
       />
       {editor.isEditable && (
         <div
@@ -140,19 +157,9 @@ export const ResizableImageNodeView: React.FC<NodeViewProps> = ({ node, updateAt
           aria-label="Resize image"
           tabIndex={0}
           onMouseDown={handleMouseDown}
-          style={{
-            position: 'absolute',
-            bottom: '0px',
-            right: '0px',
-            width: '12px',
-            height: '12px',
-            backgroundColor: 'rgba(0, 0, 255, 0.7)',
-            border: '1px solid white',
-            borderRadius: '2px',
-            cursor: 'nwse-resize',
-            boxSizing: 'border-box',
-            opacity: isResizing || ((editor.state.selection as any).node === node) ? 1 : 0.3, // Show on selection/resize
-            transition: 'opacity 0.2s'
+          className={styles.resizeHandle} // Use class from CSS module
+          style={{ // Keep dynamic opacity style
+            opacity: isResizing || ((editor.state.selection as any).node === node) ? 1 : 0.3,
           }}
         />
       )}

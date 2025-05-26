@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react' // Added BubbleMenu
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Link from '@tiptap/extension-link'
@@ -16,6 +16,8 @@ import { PasteRule } from '@tiptap/core'
 import { EmbedFrameExtension } from './EmbedNode' // Import the new EmbedFrameExtension
 import { CitationMark } from './CitationMark' // Import the new CitationMark
 import ResizableImageNodeView from './ResizableImageNodeView' // Import the custom node view
+import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
+import AutoJoiner from 'tiptap-extension-auto-joiner';
 
 // Estilos para el editor
 import './SimpleEditor.css'
@@ -263,6 +265,21 @@ const MenuBar = ({ editor }: { editor: any }) => {
         >
           <span className="icon">{'{ }'}</span>
         </button>
+        {/* Indent and Outdent Buttons */}
+        <button
+          onClick={() => editor.chain().focus().sinkListItem('listItem').run()}
+          disabled={!editor.can().sinkListItem('listItem')}
+          title="Aumentar sangría"
+        >
+          <span className="icon">→</span>
+        </button>
+        <button
+          onClick={() => editor.chain().focus().liftListItem('listItem').run()}
+          disabled={!editor.can().liftListItem('listItem')}
+          title="Disminuir sangría"
+        >
+          <span className="icon">←</span>
+        </button>
       </div>
 
       <div className="menu-section">
@@ -465,7 +482,19 @@ const SimpleEditor = ({ content, onChange, initialContent, onEditorReady }: Simp
                     if (!attributes.style) return {};
                     return { style: attributes.style };
                 }
-            }
+            },
+            float: {
+              default: 'none', // Values: 'none', 'left', 'right'
+              parseHTML: element => element.style.float || 'none',
+              renderHTML: attributes => {
+                if (attributes.float === 'none' || !attributes.float) {
+                  return {};
+                }
+                // This will be applied to the main <img> tag if renderHTML is used,
+                // but ResizableImageNodeView will also use this attribute directly.
+                return { style: `float: ${attributes.float};` }; 
+              },
+            },
           };
         },
         // Then, extend again to add the paste rules (if this chaining is problematic, combine extends)
@@ -521,6 +550,11 @@ const SimpleEditor = ({ content, onChange, initialContent, onEditorReady }: Simp
       VideoExtension,
       EmbedFrameExtension, // Add the new extension here
       CitationMark, // Add the new citation mark here
+      // Drag and Drop Extensions
+      GlobalDragHandle.configure({
+        // Add any specific configurations here if needed
+      }),
+      AutoJoiner,
     ],
     content: initialContent || content,
     onUpdate: ({ editor }) => {
@@ -579,6 +613,33 @@ const SimpleEditor = ({ content, onChange, initialContent, onEditorReady }: Simp
   return (
     <div className="simple-editor" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <MenuBar editor={editor} />
+      {editor && (
+        <BubbleMenu
+          editor={editor}
+          tippyOptions={{ duration: 100, placement: 'top', appendTo: 'parent' }}
+          className="image-bubble-menu" // Use class for styling from SimpleEditor.css
+          shouldShow={({ editor: currentEditor }) => currentEditor.isActive('image')}
+        >
+          <button
+            onClick={() => editor.chain().focus().updateAttributes('image', { float: 'left' }).run()}
+            className={editor.isActive('image', { float: 'left' }) ? 'is-active' : ''}
+          >
+            Float Left
+          </button>
+          <button
+            onClick={() => editor.chain().focus().updateAttributes('image', { float: 'right' }).run()}
+            className={editor.isActive('image', { float: 'right' }) ? 'is-active' : ''}
+          >
+            Float Right
+          </button>
+          <button
+            onClick={() => editor.chain().focus().updateAttributes('image', { float: 'none' }).run()}
+            className={editor.isActive('image', { float: 'none' }) ? 'is-active' : ''}
+          >
+            No Float
+          </button>
+        </BubbleMenu>
+      )}
       <EditorContent editor={editor} style={{ flexGrow: 1, overflowY: 'auto' }}/>
     </div>
   )

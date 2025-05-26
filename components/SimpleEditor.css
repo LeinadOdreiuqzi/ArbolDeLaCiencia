@@ -243,3 +243,75 @@
     min-height: 200px;
   }
 }
+
+/* Image Bubble Menu Styles */
+.image-bubble-menu {
+  display: flex;
+  background-color: #333; /* Dark background */
+  padding: 4px;
+  border-radius: 6px;
+  box-shadow: var(--editor-shadow);
+}
+
+.image-bubble-menu button {
+  background: transparent;
+  border: none;
+  color: white;
+  padding: 6px 8px;
+  margin: 0 2px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.85em;
+  transition: var(--editor-transition);
+}
+
+.image-bubble-menu button:hover {
+  background-color: #555;
+}
+
+.image-bubble-menu button.is-active {
+  background-color: var(--editor-primary); /* Use theme's active color */
+  color: white;
+}
+
+/* --- Global Drag Handle Styles for SimpleEditor.css --- */
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; /* Adjusted size */
+  height: 22px; /* Adjusted size */
+  cursor: grab;
+  color: #aaa; /* Handle icon/content color */
+  position: absolute; /* Positioned by the extension relative to the draggable node */
+  /* left: -28px; */ /* The extension itself usually handles positioning. 
+                     If manual adjustment is needed, this can be uncommented and tweaked.
+                     The GlobalDragHandle extension might have its own way to set offset or might appear on hover. */
+  background-color: #f8f9fa; /* Light background for the handle */
+  border: 1px solid #dee2e6; /* Subtle border */
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  opacity: 0.6; /* Slightly transparent by default */
+  transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+.drag-handle:hover {
+  color: #333;
+  background-color: #e9ecef; /* Slightly darker on hover */
+  opacity: 1;
+}
+
+/* When dragging (the extension might add a class to the body or editor) */
+/* .tiptap-is-dragging .drag-handle,  */ /* Tiptap's specific class might be different or not used by this extension */
+.drag-handle:active { /* More general active state */
+  cursor: grabbing;
+  background-color: #dee2e6; /* Darker when active/grabbing */
+  color: #000;
+  opacity: 1;
+}
+
+/* If the extension adds a class to hide the handle, this can be used */
+.drag-handle.hide {
+  opacity: 0;
+  pointer-events: none;
+}
