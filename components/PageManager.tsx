@@ -289,16 +289,19 @@ export default function PageManager() {
   const tree = buildTree(pages);
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 100px)" }}>
+    <div style={{ 
+      display: "flex", 
+      height: "100vh",
+      margin: 0,
+      padding: 0,
+      overflow: 'hidden'
+    }}>
       {/* New Parent Container for Left Section (Button + Panel) */}
       <div style={{ display: "flex", flexDirection: "column", borderRight: "1px solid #ccc" }}>
         <button 
           onClick={() => setIsHierarchyVisible(!isHierarchyVisible)} 
-          style={{ 
-            padding: "5px 10px",
-            margin: "10px",
-            alignSelf: "flex-start"
-          }}
+          className="pm-button pm-button-subtle"
+          style={{ margin: "10px", alignSelf: "flex-start" }} // Keep margin and alignment
         >
           {isHierarchyVisible ? "Ocultar Navegación" : "Mostrar Navegación"}
         </button>
@@ -324,34 +327,40 @@ export default function PageManager() {
             <hr style={{ margin: '15px 0' }}/>
             {/* Botones para crear nuevos elementos */} 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button onClick={handleCreateArea}>+ Nueva Área</button>
+              <button onClick={handleCreateArea} className="pm-button">+ Nueva Área</button>
               {/* Show Especialidad button if a level 1+ item is selected, enable only if level 1 is selected */}
-              {selectedLevel >= 1 && <button onClick={handleCreateEspecialidad} disabled={selectedLevel !== 1}>+ Nueva Especialidad</button>}
+              {selectedLevel >= 1 && <button onClick={handleCreateEspecialidad} disabled={selectedLevel !== 1} className="pm-button">+ Nueva Especialidad</button>}
               {/* Show Tema button if a level 2+ item is selected, enable only if level 2 is selected */}
-              {selectedLevel >= 2 && <button onClick={handleCreateTema} disabled={selectedLevel !== 2}>+ Nuevo Tema</button>}
+              {selectedLevel >= 2 && <button onClick={handleCreateTema} disabled={selectedLevel !== 2} className="pm-button">+ Nuevo Tema</button>}
               {/* Show Contenido button if a level 3+ item is selected, enable only if level 3 is selected */}
-              {selectedLevel >= 3 && <button onClick={handleCreateContenido} disabled={selectedLevel !== 3}>+ Nuevo Contenido</button>}
+              {selectedLevel >= 3 && <button onClick={handleCreateContenido} disabled={selectedLevel !== 3} className="pm-button">+ Nuevo Contenido</button>}
             </div>
           </div>
         </div>
       </div>
 
       {/* Editor Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+      <div style={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'row', 
+        overflow: 'hidden',
+        margin: 0,
+        padding: 0,
+        minHeight: 0 // Asegura que el contenedor no exceda el espacio disponible
+      }}>
         {/* Main Editor Content */}
-        <div style={{ flex: 3, padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ 
+          flex: 3, 
+          padding: "12px", 
+          overflowY: 'auto', 
+          display: 'flex', 
+          flexDirection: 'column',
+          margin: 0,
+          minHeight: 0 // Asegura que el contenedor no exceda el espacio disponible
+        }}>
           {selectedPage ? (
             <>
-              {/* Preview Toggle Button - Positioned above title/editor */}
-              <div style={{ marginBottom: 15, display: 'flex', justifyContent: 'flex-end' }}>
-                <button 
-                  onClick={() => setIsPreviewModeActive(!isPreviewModeActive)}
-                  style={{ padding: '8px 12px', borderRadius: '4px', cursor: 'pointer' }}
-                >
-                  {isPreviewModeActive ? "Volver al Editor" : "Previsualizar Contenido"}
-                </button>
-              </div>
-
               {!isPreviewModeActive ? (
                 <>
                   {/* Existing Title Input */}
@@ -376,22 +385,76 @@ export default function PageManager() {
                   />
                   {/* Existing Save/Undo buttons and notices */}
                   <div style={{ marginTop: 15, display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <button onClick={handleSaveClick} disabled={!draftChanged || saveLoading}>
+                    <button onClick={handleSaveClick} disabled={!draftChanged || saveLoading} className="pm-button pm-button-primary">
                       {saveLoading ? "Guardando..." : "Guardar Cambios"}
                     </button>
-                    <button onClick={handleUndoDraft} disabled={!draftChanged || saveLoading}>Descartar</button>
+                    <button onClick={handleUndoDraft} disabled={!draftChanged || saveLoading} className="pm-button pm-button-secondary">Descartar</button>
+                    {/* Preview Toggle Button - Moved here */}
+                    <button 
+                      onClick={() => setIsPreviewModeActive(!isPreviewModeActive)}
+                      className="pm-button" // Using pm-button, could be pm-button-secondary too
+                      style={{ marginLeft: 'auto' }} // Keep marginLeft: auto for positioning
+                    >
+                      {isPreviewModeActive ? "Volver al Editor" : "Previsualizar Contenido"}
+                    </button>
                     {showSaveNotice && <span style={{ color: 'green' }}>Guardado ✓</span>}
                     {showErrorNotice && <span style={{ color: 'red' }}>{showErrorNotice}</span>}
                     {!draftChanged && !showSaveNotice && !showErrorNotice && <span style={{ color: '#888' }}>Contenido al día</span>}
                   </div>
                 </>
               ) : (
-                // Preview Mode Content
-                <div style={{paddingTop: '10px'}}>
-                  <h2 style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: 20 }}>
-                    {editTitle || selectedPage.title}
-                  </h2>
-                  <div className="prose-preview" /* Optional class for preview-specific styling */>
+                // Preview Mode Content - Estilo similar a pages-arbol
+                <div style={{ 
+                  padding: '2.5rem 3rem',
+                  minHeight: '100vh',
+                  color: 'var(--foreground, #283044)',
+                  background: 'var(--background, #f8f9fa)',
+                  fontSize: '1.125rem',
+                  lineHeight: 1.7,
+                  borderRadius: '8px',
+                  boxShadow: '0 1px 8px rgba(0, 0, 0, 0.03)',
+                  margin: '1.5rem auto',
+                  maxWidth: '80ch',
+                  position: 'relative'
+                }}>
+                  <div style={{
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    borderBottom: '1px solid var(--border, #e2e8f0)',
+                    paddingBottom: '1rem',
+                    marginBottom: '2rem'
+                  }}>
+                    <h1 style={{ 
+                      fontSize: '1.8em', 
+                      fontWeight: 700, 
+                      margin: 0,
+                      color: 'var(--foreground, #283044)'
+                    }}>
+                      {editTitle || selectedPage.title}
+                    </h1>
+                    <button 
+                      onClick={() => setIsPreviewModeActive(false)}
+                      className="pm-button pm-button-primary"
+                      style={{ 
+                        marginLeft: '15px',
+                        padding: '8px 15px',
+                        fontSize: '14px',
+                        fontWeight: 500
+                      }}
+                    >
+                      Volver al Editor
+                    </button>
+                  </div>
+                  <div 
+                    className="prose-preview" 
+                    style={{ 
+                      maxWidth: '100%',
+                      margin: '0 auto',
+                      fontFamily: 'Geist, Arial, Helvetica, sans-serif',
+                      color: 'var(--foreground, #283044)'
+                    }}
+                  >
                     <RichTextRenderer content={draftContent} />
                   </div>
                 </div>
@@ -410,11 +473,8 @@ export default function PageManager() {
           }}>
             <button 
               onClick={() => setIsTocVisible(!isTocVisible)} 
-              style={{ 
-                margin: "10px 10px 0 10px", // Margin for spacing
-                padding: "5px",
-                alignSelf: "flex-start" 
-              }}
+              className="pm-button pm-button-subtle"
+              style={{ margin: "10px 10px 0 10px", alignSelf: "flex-start" }} // Keep margin and alignment
             >
               {isTocVisible ? "Ocultar ToC" : "Mostrar ToC"}
             </button>
@@ -438,17 +498,6 @@ export default function PageManager() {
           </div>
         )}
       </div>
-      {/* Modal de confirmación */}
-      {showUnsavedModal && (
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', padding: '30px', border: '1px solid #ccc', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', zIndex: 1001 }}>
-              <h3>Cambios sin guardar</h3>
-              <p>Tienes cambios sin guardar. ¿Quieres descartarlos y cambiar de página?</p>
-              <button onClick={confirmChangePage} style={{ marginRight: 10 }}>Sí, descartar</button>
-              <button onClick={cancelChangePage}>No, cancelar</button>
-          </div>
-      )}
-      {showUnsavedModal && <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000 }} onClick={cancelChangePage}></div>} 
-
     </div>
   );
 }
