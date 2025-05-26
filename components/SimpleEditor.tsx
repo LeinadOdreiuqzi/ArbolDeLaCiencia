@@ -11,105 +11,22 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
-import { Node, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
-import { PasteRule } from '@tiptap/core'
-import { EmbedFrameExtension } from './EmbedNode' // Import the new EmbedFrameExtension
-import { CitationMark } from './CitationMark' // Import the new CitationMark
-import ResizableImageNodeView from './ResizableImageNodeView' // Import the custom node view
+// Node, NodeViewWrapper, PasteRule are encapsulated in new extension files or not needed at top level
+import { ReactNodeViewRenderer } from '@tiptap/react' // Still needed for ResizableImageNodeView
+import { EmbedFrameExtension } from './EmbedNode'
+import { CitationMark } from './CitationMark'
+import ResizableImageNodeView from './ResizableImageNodeView'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
 import AutoJoiner from 'tiptap-extension-auto-joiner';
+
+// Import refactored extensions
+import { VideoExtension, getVideoEmbedUrl } from '@/lib/tiptap-extensions/VideoExtension' // getVideoEmbedUrl still needed for MenuBar
+import { CustomImageExtension as EditorCustomImageExtension } from '@/lib/tiptap-extensions/CustomImageExtension'
 
 // Estilos para el editor
 import './SimpleEditor.css'
 
-// Helper function to convert video URLs to embeddable format
-function getVideoEmbedUrl(url: string): string | null {
-  let embedUrl = url;
-  if (url.includes('youtube.com/watch') || url.includes('youtu.be')) {
-    const videoIdMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-    const videoId = videoIdMatch ? videoIdMatch[1] : null;
-    if (videoId) {
-      embedUrl = `https://www.youtube.com/embed/${videoId}`;
-    } else {
-      return null; // Not a valid YouTube URL for embedding
-    }
-  } else if (url.includes('vimeo.com')) {
-    const videoIdMatch = url.match(/vimeo\.com\/(?:video\/)?([0-9]+)/);
-    const videoId = videoIdMatch ? videoIdMatch[1] : null;
-    if (videoId) {
-      embedUrl = `https://player.vimeo.com/video/${videoId}`;
-    } else {
-      return null; // Not a valid Vimeo URL for embedding
-    }
-  } else {
-    return null; // Not a YouTube or Vimeo URL
-  }
-  return embedUrl;
-}
-
-// Componente para insertar videos embebidos
-const VideoComponent = (props: any) => {
-  return (
-    <NodeViewWrapper className="video-wrapper">
-      <div className="video-container">
-        <iframe
-          src={props.node.attrs.src}
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        ></iframe>
-      </div>
-    </NodeViewWrapper>
-  )
-}
-
-// Extensión personalizada para videos embebidos
-const VideoExtension = Node.create({
-  name: 'video',
-  group: 'block',
-  atom: true,
-  addAttributes() {
-    return {
-      src: {
-        default: null,
-      },
-    }
-  },
-  parseHTML() {
-    return [
-      {
-        tag: 'iframe[src*="youtube.com"], iframe[src*="vimeo.com"]', // For parsing existing iframes if any
-      },
-      {
-        tag: 'div[data-type="video"]', // For custom representation
-      }
-    ]
-  },
-  renderHTML({ HTMLAttributes }) {
-    // Return an iframe for semantic HTML, but our NodeView will take over rendering
-    return ['iframe', { ...HTMLAttributes, 'data-type': 'video', frameBorder: 0, allowfullscreen: '' }];
-  },
-  addNodeView() {
-    return ReactNodeViewRenderer(VideoComponent)
-  },
-  addPasteRules() {
-    return [
-      new PasteRule({
-        find: /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|vimeo\.com\/)\S+/g,
-        handler: ({ state, range, match }) => {
-          const url = match[0];
-          const embedUrl = getVideoEmbedUrl(url);
-
-          if (embedUrl) {
-            const { tr } = state;
-            const node = state.schema.nodes.video.create({ src: embedUrl });
-            tr.replaceWith(range.from, range.to, node);
-          }
-        },
-      }),
-    ]
-  },
-})
+// getVideoEmbedUrl, VideoComponent, and VideoExtension (Tiptap Node) are now imported or handled by VideoExtension.ts
 
 const MenuBar = ({ editor }: { editor: any }) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -446,95 +363,13 @@ const SimpleEditor = ({ content, onChange, initialContent, onEditorReady }: Simp
           target: '_blank',
         },
       }),
-      Image.configure({
-        allowBase64: true,
-        inline: true, // Keep images inline
-        // HTMLAttributes are used by renderHTML for the main <img> tag
-        HTMLAttributes: {
-          class: 'tiptap-image', // Added a class for general styling if needed
-        },
-      }).extend({
-        // First, extend to add custom attributes for width and height
-        addAttributes() {
-          return {
-            ...this.parent?.(), // Retain existing attributes (src, alt, title)
-            width: {
-              default: null,
-              parseHTML: element => element.style.width || element.getAttribute('width'),
-              renderHTML: attributes => {
-                if (!attributes.width) return {};
-                return { width: attributes.width };
-              },
-            },
-            height: {
-              default: null,
-              parseHTML: element => element.style.height || element.getAttribute('height'),
-              renderHTML: attributes => {
-                if (!attributes.height) return {};
-                return { height: attributes.height };
-              },
-            },
-            // style attribute to allow floating and other styles if needed in future
-            style: {
-                default: null,
-                parseHTML: element => element.getAttribute('style'),
-                renderHTML: attributes => {
-                    if (!attributes.style) return {};
-                    return { style: attributes.style };
-                }
-            },
-            float: {
-              default: 'none', // Values: 'none', 'left', 'right'
-              parseHTML: element => element.style.float || 'none',
-              renderHTML: attributes => {
-                if (attributes.float === 'none' || !attributes.float) {
-                  return {};
-                }
-                // This will be applied to the main <img> tag if renderHTML is used,
-                // but ResizableImageNodeView will also use this attribute directly.
-                return { style: `float: ${attributes.float};` }; 
-              },
-            },
-          };
-        },
-        // Then, extend again to add the paste rules (if this chaining is problematic, combine extends)
-      }).extend({
-        addPasteRules() {
-          return [
-            new PasteRule({
-              find: /https?:\/\/\S+\.(?:png|jpe?g|gif|webp|bmp|svg|tiff|ico)\S*/g,
-              handler: ({ state, range, match }) => {
-                const url = match[0];
-                const pastedText = state.doc.textBetween(range.from, range.to, " ");
-                if (url.trim() === pastedText.trim()) {
-                  // Create node with src, let NodeView handle initial size via natural dimensions if w/h not set
-                  state.tr.replaceWith(range.from, range.to, this.type.create({ src: url }));
-                }
-              },
-            }),
-          ];
-        },
-        // Finally, extend to add the custom node view
-      }).extend({
+      // Use the imported custom image extension, configured with ResizableImageNodeView for the editor
+      EditorCustomImageExtension.extend({
         addNodeView() {
           return ReactNodeViewRenderer(ResizableImageNodeView);
         },
-        // Ensure renderHTML from the base Image extension is still somewhat respected
-        // The NodeView will take over rendering, but this can be a fallback or for static output
-        renderHTML({ node, HTMLAttributes }) {
-            // HTMLAttributes from addAttributes will include width/height if they exist
-            // The default Image extension's renderHTML is ['img', HTMLAttributes]
-            // We need to ensure our width/height are included
-            const { width, height, style } = node.attrs;
-            const attrs = { ...HTMLAttributes };
-            if (width) attrs.width = String(width); // Ensure it's string for HTML
-            if (height) attrs.height = String(height);
-            if (style) attrs.style = style;
-            
-            // If inline, Tiptap often wraps in a span. Our NodeView uses span as wrapper.
-            // For static HTML, just outputting 'img' is fine.
-            return ['img', attrs];
-        }
+        // renderHTML logic is already in EditorCustomImageExtension, suitable for static output.
+        // NodeView (ResizableImageNodeView) handles editor rendering.
       }),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
@@ -547,10 +382,9 @@ const SimpleEditor = ({ content, onChange, initialContent, onEditorReady }: Simp
       TableRow,
       TableHeader,
       TableCell,
-      VideoExtension,
-      EmbedFrameExtension, // Add the new extension here
-      CitationMark, // Add the new citation mark here
-      // Drag and Drop Extensions
+      VideoExtension, // Use the imported VideoExtension
+      EmbedFrameExtension,
+      CitationMark,
       GlobalDragHandle.configure({
         // Add any specific configurations here if needed
       }),
