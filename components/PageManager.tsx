@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import RichTextRenderer from "./RichTextRenderer";
+import RichTextRenderer from "./ui/RichTextRenderer";
 import dynamic from 'next/dynamic';
 import { Editor } from "@tiptap/react";
-import EditorTableOfContents from "./EditorTableOfContents";
-import PageHierarchyPanel from "./PageHierarchyPanel";
+import EditorTableOfContents from "./editor/EditorTableOfContents";
+import PageHierarchyPanel from "./navigation/PageHierarchyPanel";
 
 // Función para construir el árbol de páginas
 function buildTree(pages: any[]) {
@@ -31,7 +31,7 @@ function getTypeByLevel(level: number) {
   }
 }
 
-const SimpleEditor = dynamic(() => import('./SimpleEditor'), {
+const SimpleEditor = dynamic(() => import('./editor/SimpleEditor'), {
   ssr: false,
   loading: () => <p>Cargando editor...</p> // Optional loading indicator
 });

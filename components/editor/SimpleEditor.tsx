@@ -46,9 +46,9 @@ import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 // Node, NodeViewWrapper, PasteRule are encapsulated in new extension files or not needed at top level
 import { ReactNodeViewRenderer } from '@tiptap/react' // Still needed for ResizableImageNodeView
-import { EmbedFrameExtension } from './EmbedNode'
-import { CitationMark } from './CitationMark'
-import ResizableImageNodeView from './ResizableImageNodeView'
+import { EmbedFrameExtension } from './nodes/EmbedNode';
+import { CitationMark } from './nodes/CitationMark';
+import ResizableImageNodeView from './ResizableImageNodeView';
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
 import AutoJoiner from 'tiptap-extension-auto-joiner';
 

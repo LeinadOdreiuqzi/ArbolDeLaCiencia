@@ -15,7 +15,7 @@ This React component uses `react-force-graph-2d` to render a knowledge graph wit
    ```
 2. Import and use the component:
    ```tsx
-   import LargeKnowledgeGraph from "../components/LargeKnowledgeGraph";
+   import LargeKnowledgeGraph from "../components/knowledge-graph/LargeKnowledgeGraph";
    <LargeKnowledgeGraph />
    ```
 
